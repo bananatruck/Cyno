@@ -1,4 +1,3 @@
----
 
 # Project Proposal: Cyno – The Agentic Astronomy Companion (72-Hour Sprint Edition)
 
