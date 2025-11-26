@@ -1,7 +1,3 @@
-Short answer: **yes**, 3 days is *only* realistic if you go **deep on one hero feature** and treat everything else as a very small MVP / stub, then flesh it out in December–January. Trying to build *all* of Cyno properly in 3 days will wreck both quality and your sanity 😂.
-
----
-
 ## 1. What’s realistic in 3 days?
 
 Given your timeline, skills, and the feature list, this is what’s realistic:
