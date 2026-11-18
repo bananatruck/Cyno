@@ -15,7 +15,8 @@ tells you when something worth looking at is about to happen.
 | -------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
 | ![Cyno on a phone, stacked layout](docs/screenshots/phone.png) | ![The same plan in Red-Light Mode](docs/screenshots/red-light.png) | ![Tromso at midsummer: the Sun never sets](docs/screenshots/polar-day.png) |
 
-The screenshots are taken by the browser test for Long Beach, CA on 2026-11-17 with the cloud forecast blocked, so they show computed data only.
+The desktop, phone and Red-Light screenshots show Long Beach, CA on 2026-11-17, and the third table image shows Tromso on 2026-06-21.
+The browser test takes them with the cloud forecast blocked, so they show computed data only.
 They are not deployed anywhere yet; see "Run it" to open the app locally.
 
 ## What is here
@@ -61,7 +62,7 @@ happened, which is worse than committing to nothing.
 
 ## Run it
 
-You need Node 20 or newer and pnpm 10.
+You need Node 22.22.2 or newer on the 22 line (or 24.15+, or 26+) and pnpm 10.
 
 ```sh
 pnpm install
@@ -71,6 +72,12 @@ pnpm dev
 Then open the address Vite prints (usually http://localhost:5173).
 `pnpm check` runs the format check, lint, type-check, all tests and the production build.
 `pnpm --filter @cyno/web e2e` runs the browser tests and refreshes the screenshots; the first time, install the browser with `pnpm --filter @cyno/web exec playwright install chromium`.
+
+## Deploy
+
+`.github/workflows/pages.yml` builds `apps/web` and publishes it to GitHub Pages on every push to `main`.
+Pages must use GitHub Actions as its source before the first run: Settings, Pages, Source, GitHub Actions, or `gh api -X POST repos/bananatruck/Cyno/pages -f build_type=workflow`.
+The build uses relative asset paths, so the same output works at the root of a domain and under `/Cyno/`.
 
 ## Using the app
 
@@ -82,7 +89,7 @@ Then open the address Vite prints (usually http://localhost:5173).
 - "Not visible tonight" lists every catalog object that did not make it, with the reason.
 - Red-Light Mode turns the whole interface deep red to protect night vision, and is remembered in your browser.
 - The address bar always holds the place, date, sky and equipment, so a plan can be shared as a link.
-- Everything except the cloud forecast works offline. Without a forecast the app says so and ranks without clouds instead of assuming a clear sky.
+- Once the page has loaded, every calculation runs in the browser with no network; only the optional cloud forecast needs a connection. Loading the page itself needs a connection, as there is no offline install yet. Without a forecast the app says so and ranks without clouds instead of assuming a clear sky.
 
 ## How the ranking works
 
@@ -102,7 +109,7 @@ Polar day, polar night and summer nights that never get fully dark are normal re
 The sky's brightness is the sum of three sources: light pollution (a preset from city to dark site), twilight, and moonlight at the object's position from the Krisciunas and Schaefer (1991) model.
 That brightness sets a limiting magnitude, raised by a fixed amount for binoculars or a telescope.
 An object's magnitude is dimmed by the air it shines through and, for galaxies and nebulae, by a penalty for being spread out.
-The difference is the margin: an object is visible when it is at least 10 degrees up, the Sun is down, the margin is positive, and clouds (when a forecast is available) are under 80 percent.
+The difference is the margin: an object is visible when it is at least 10 degrees up, the Sun is below -0.833 degrees, the margin is zero or more, and clouds (when a forecast is available) are under 80 percent.
 The best moment is the visible sample with the largest margin.
 
 **The visibility score adds six visible parts.**
@@ -136,7 +143,7 @@ Where no published value exists, the tests check invariants instead: scores equa
 ## Data sources
 
 - Stars: the [IAU Catalog of Star Names](https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt), named stars brighter than magnitude 2.5.
-- Messier objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga (CC BY-SA 4.0), with globular cluster magnitudes that OpenNGC lacks taken from the [Harris catalog](https://physics.mcmaster.ca/~harris/mwgc.dat). M35 is left out because none of these sources gives its magnitude.
+- Messier objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga (CC BY-SA 4.0), with globular cluster magnitudes that OpenNGC lacks taken from the [Harris catalog](https://physics.mcmaster.ca/~harris/mwgc.dat). M35 is left out because none of these sources gives its magnitude, and M102 because it has no agreed identification (OpenNGC files it under M101), which leaves 108 of the 110.
 - Cloud cover: [Open-Meteo](https://open-meteo.com/), free and keyless, fetched by the browser and optional.
 
 `packages/engine/scripts/build-catalog.py` downloads the sources and regenerates `catalog.json`; the generated file is not edited by hand.
@@ -154,5 +161,6 @@ The natural next steps, roughly in order:
 
 ## License
 
-MIT for the code.
-The generated catalog includes data derived from OpenNGC, which is CC BY-SA 4.0.
+MIT for Cyno's own code.
+Some adapted UI components and the catalog data keep their own terms: React Bits (MIT + Commons Clause), Aceternity UI (its own licence, not MIT) and OpenNGC (CC BY-SA 4.0).
+The details and notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
