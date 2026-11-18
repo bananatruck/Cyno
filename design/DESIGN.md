@@ -8,15 +8,15 @@ Kesh's own direction in `GeminiPlan.md` is "Comfort in the Cosmos", "Nebula & Gl
 
 ## Palette
 
-| Token | Hex | Role |
-|---|---|---|
-| abyss | #050816 | Page background: the sky at astronomical night, blue-black rather than neutral black |
-| nautical | #13204A | Panels and the nautical-twilight band |
-| civil | #34508F | Civil-twilight band, hover surfaces |
-| horizon | #F2B880 | Sunset and sunrise band only, plus the best-time marker |
-| starlight | #F4EFE2 | Primary text and star glyphs, a warm white |
-| moonsilver | #AEB8D6 | Secondary text, the Moon and its arc |
-| signal | #8EA7FF | Selection and focus, a cool periwinkle |
+| Token      | Hex     | Role                                                                                 |
+| ---------- | ------- | ------------------------------------------------------------------------------------ |
+| abyss      | #050816 | Page background: the sky at astronomical night, blue-black rather than neutral black |
+| nautical   | #13204A | Panels and the nautical-twilight band                                                |
+| civil      | #34508F | Civil-twilight band, hover surfaces                                                  |
+| horizon    | #F2B880 | Sunset and sunrise band only, plus the best-time marker                              |
+| starlight  | #F4EFE2 | Primary text and star glyphs, a warm white                                           |
+| moonsilver | #AEB8D6 | Secondary text, the Moon and its arc                                                 |
+| signal     | #8EA7FF | Selection and focus, a cool periwinkle                                               |
 
 Red-Light Mode replaces every token with reds on #120000: text #FF5A4E, secondary #B3362E, panels #2A0505, nothing blue or white anywhere.
 
