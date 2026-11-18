@@ -70,6 +70,24 @@ describe("formatDarkAndMoonSummary", () => {
     );
   });
 
+  it("says Darkest for astronomical twilight on London summer solstice", () => {
+    const london = planNight({
+      latitude: 51.51,
+      longitude: -0.13,
+      date: "2026-06-21",
+      timeZone: "Europe/London",
+    });
+    const dark = london.darkWindow!;
+    const zone = london.input.timeZone;
+    const line = formatDarkAndMoonSummary(london);
+    expect(line).toMatch(
+      new RegExp(
+        `^Darkest ${formatTimeHHMM(dark.start, zone).replace(/:/g, "\\:")} to ${formatTimeHHMM(dark.end, zone).replace(/:/g, "\\:")} \\(\\d+\\.\\d hours\\), in astronomical twilight: the sky never gets fully dark\\. `,
+      ),
+    );
+    expect(line).not.toMatch(/^Dark \d/);
+  });
+
   it("does not repeat Moon in phase names that already end with it, and says when the Moon stays down", () => {
     const newMoon = { ...plan, moon: { ...plan.moon, phaseName: "New Moon", hoursUpInDarkWindow: 0 } };
     expect(formatDarkAndMoonSummary(newMoon)).toMatch(

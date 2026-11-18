@@ -104,6 +104,7 @@ export function BlurText({
         }}
         className={cn("inline-flex flex-wrap items-baseline", className)}
       >
+        <span className="sr-only">{text}</span>
         {elements.map((segment, index) => {
           const animateKeyframes = buildKeyframes(fromSnapshot, toSnapshots);
           const spanTransition: Transition = {
@@ -116,6 +117,7 @@ export function BlurText({
           return (
             <m.span
               key={`${segment}-${index}`}
+              aria-hidden="true"
               initial={fromSnapshot}
               animate={inView ? animateKeyframes : fromSnapshot}
               transition={spanTransition}

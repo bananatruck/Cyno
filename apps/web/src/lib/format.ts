@@ -1,4 +1,4 @@
-import type { NightCondition, NightPlan, ObjectKind } from "@cyno/engine";
+import type { DarkWindow, NightCondition, NightPlan, ObjectKind } from "@cyno/engine";
 import type { WeatherStatus } from "./weather";
 
 /** Rounds to the nearest minute, as the engine does, so every clock time in the UI agrees with its reasons. */
@@ -14,6 +14,20 @@ export function formatTimeHHMM(isoString: string, timeZone: string): string {
   }
 }
 
+function formatDarkWindowSummaryLine(dark: DarkWindow, timeZone: string): string {
+  const range = `${formatTimeHHMM(dark.start, timeZone)} to ${formatTimeHHMM(dark.end, timeZone)} (${dark.hours.toFixed(1)} hours)`;
+  switch (dark.level) {
+    case "night":
+      return `Dark ${range}.`;
+    case "astronomical-twilight":
+      return `Darkest ${range}, in astronomical twilight: the sky never gets fully dark.`;
+    case "nautical-twilight":
+      return `Darkest ${range}, in nautical twilight.`;
+    default:
+      return `Dark ${range}.`;
+  }
+}
+
 /** "Dark 18:15 to 05:01 (10.8 hours). Waxing Gibbous Moon, 58% lit, up for 5.8 dark hours." */
 export function formatDarkAndMoonSummary(plan: NightPlan): string | null {
   const dark = plan.darkWindow;
@@ -23,14 +37,11 @@ export function formatDarkAndMoonSummary(plan: NightPlan): string | null {
   const moonName = phaseName.endsWith("Moon") ? phaseName : `${phaseName} Moon`;
   const hoursUp = hoursUpInDarkWindow.toFixed(1);
   const moonUp = hoursUp === "0.0" ? "not up during the dark hours" : `up for ${hoursUp} dark hours`;
-  return (
-    `Dark ${formatTimeHHMM(dark.start, zone)} to ${formatTimeHHMM(dark.end, zone)} (${dark.hours.toFixed(1)} hours). ` +
-    `${moonName}, ${Math.round(illumination * 100)}% lit, ${moonUp}.`
-  );
+  return `${formatDarkWindowSummaryLine(dark, zone)} ${moonName}, ${Math.round(illumination * 100)}% lit, ${moonUp}.`;
 }
 
 /** The engine's dark-window and Moon sentences, which formatDarkAndMoonSummary already covers. */
-const DARK_OR_MOON_REASON = /^(Dark from \S+ to \S+ \(|The \d+% Moon is up for )/;
+const DARK_OR_MOON_REASON = /^(Dark from \S+ to \S+ \(|Darkest from \S+ to \S+ \(|The \d+% Moon is up for )/;
 
 export function reasonsBesideDarkAndMoon(reasons: readonly string[]): string[] {
   return reasons.filter((reason) => !DARK_OR_MOON_REASON.test(reason));

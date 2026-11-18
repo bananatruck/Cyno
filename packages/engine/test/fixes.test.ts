@@ -81,7 +81,7 @@ it("explains limited nautical darkness with the lowest Sun altitude", () => {
   expect(plan.verdict.score).toBeGreaterThan(0);
   expect(plan.verdict.score).toBeLessThan(65);
   expect(plan.verdict.label).not.toBe("go");
-  expect(plan.verdict.reasons.some((r) => r.startsWith("Dark from "))).toBe(true);
+  expect(plan.verdict.reasons.some((r) => r.startsWith("Darkest from "))).toBe(true);
 });
 
 it("reports London no-astronomical-darkness with a normal dark-window verdict", () => {
@@ -93,7 +93,9 @@ it("reports London no-astronomical-darkness with a normal dark-window verdict", 
   });
   expect(plan.condition).toBe("no-astronomical-darkness");
   expect(plan.darkWindow?.level).toBe("astronomical-twilight");
-  expect(plan.verdict.reasons[0]).toMatch(/^Dark from /);
+  expect(plan.verdict.reasons[0]).toMatch(
+    /^Darkest from \d\d:\d\d to \d\d:\d\d \(\d+\.\d hours\), in astronomical twilight: the sky never gets fully dark\.$/,
+  );
 });
 
 it("uses peak altitude only while the sky is dark when the object culminates in daytime", () => {

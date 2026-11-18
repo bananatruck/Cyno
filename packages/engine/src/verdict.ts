@@ -1,6 +1,24 @@
 import type { DarkWindow, MoonInfo, NightCondition, ResolvedInput, Verdict } from "./types";
 import { clamp } from "./rank";
 import { cloudAt, HOUR } from "./time";
+
+/** One sentence for the scored dark window, wording depends on how dark the sky gets. */
+export function formatDarkWindowReason(
+  dark: Pick<DarkWindow, "start" | "end" | "hours" | "level">,
+  clock: (time: string) => string,
+): string {
+  const range = `${clock(dark.start)} to ${clock(dark.end)} (${dark.hours.toFixed(1)} hours)`;
+  switch (dark.level) {
+    case "night":
+      return `Dark from ${range}.`;
+    case "astronomical-twilight":
+      return `Darkest from ${range}, in astronomical twilight: the sky never gets fully dark.`;
+    case "nautical-twilight":
+      return `Darkest from ${range}, in nautical twilight.`;
+    default:
+      return `Dark from ${range}.`;
+  }
+}
 /** Time-weighted mean over dark-window spans covered by hourly forecast samples. */
 export function meanCloud(
   input: ResolvedInput,
@@ -77,7 +95,7 @@ export function verdict(
     score,
     reasons: [
       ...(dark.level === "nautical-twilight" ? [limitedDarknessReason(condition, lowestSunAltDeg)] : []),
-      `Dark from ${clock(dark.start)} to ${clock(dark.end)} (${dark.hours.toFixed(1)} hours).`,
+      formatDarkWindowReason(dark, clock),
       `The ${Math.round(moon.illumination * 100)}% Moon is up for ${moon.hoursUpInDarkWindow.toFixed(1)} dark hours.`,
       clouds === null
         ? "Cloud cover is unknown."
