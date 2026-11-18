@@ -26,14 +26,39 @@ function screenshotPath(name: string) {
 /** Waits until web fonts are loaded and every finite animation or transition has finished. */
 async function settle(page: Page) {
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every(
-        (animation) =>
-          animation.playState !== "running" || animation.effect?.getComputedTiming().endTime === Infinity,
-      ),
-  );
+  try {
+    await page.waitForFunction(
+      () =>
+        document
+          .getAnimations()
+          .every(
+            (animation) =>
+              animation.playState !== "running" || animation.effect?.getComputedTiming().endTime === Infinity,
+          ),
+      undefined,
+      { timeout: 5_000 },
+    );
+  } catch (error) {
+    // Fail fast and name what keeps animating, instead of letting the test time out somewhere later.
+    const running = await page.evaluate(() =>
+      document
+        .getAnimations()
+        .filter((animation) => animation.playState === "running")
+        .map((animation) => {
+          const target = (animation.effect as KeyframeEffect | null)?.target;
+          const name =
+            animation instanceof CSSTransition
+              ? `transition ${animation.transitionProperty}`
+              : animation instanceof CSSAnimation
+                ? `animation ${animation.animationName}`
+                : "script animation";
+          return `${name} on ${target?.tagName.toLowerCase()}.${target?.getAttribute("class") ?? ""}`;
+        }),
+    );
+    throw new Error(`The page did not settle within 5 s. Still running: ${running.join("; ")}`, {
+      cause: error,
+    });
+  }
 }
 
 async function box(locator: Locator) {
@@ -97,13 +122,13 @@ test("without a cloud forecast, lays out desktop and phone honestly and saves sc
   expect(await page.locator("body").innerText()).not.toContain("\u00b7");
 
   await settle(page);
-  await page.screenshot({ path: screenshotPath("desktop.png"), fullPage: false });
+  await page.screenshot({ path: screenshotPath("desktop.png"), fullPage: false, animations: "disabled" });
 
   const redLightButton = page.getByRole("button", { name: "Red light" });
   await redLightButton.click();
   await expect(page.locator("html")).toHaveAttribute("data-mode", "red");
   await settle(page);
-  await page.screenshot({ path: screenshotPath("red-light.png"), fullPage: false });
+  await page.screenshot({ path: screenshotPath("red-light.png"), fullPage: false, animations: "disabled" });
   await redLightButton.click();
   await expect(page.locator("html")).not.toHaveAttribute("data-mode", "red");
 
@@ -122,7 +147,7 @@ test("without a cloud forecast, lays out desktop and phone honestly and saves sc
   }
 
   await settle(page);
-  await page.screenshot({ path: screenshotPath("phone.png"), fullPage: true });
+  await page.screenshot({ path: screenshotPath("phone.png"), fullPage: true, animations: "disabled" });
 });
 
 test("keeps the sky chart usable in a short desktop window and lets the page scroll", async ({ page }) => {
@@ -213,7 +238,7 @@ test("explains polar day in Tromso on 2026-06-21", async ({ page }) => {
   const timeline = await box(page.getByRole("region", { name: "Night sky timeline" }));
   expect(timeline.y + timeline.height, "timeline fits in a 1440x900 viewport").toBeLessThanOrEqual(900);
   await settle(page);
-  await page.screenshot({ path: screenshotPath("polar-day.png"), fullPage: false });
+  await page.screenshot({ path: screenshotPath("polar-day.png"), fullPage: false, animations: "disabled" });
 });
 
 test("shows the latitude error for latitude 95", async ({ page }) => {
@@ -239,7 +264,7 @@ test("shows the latitude error for latitude 95", async ({ page }) => {
   expect(alertBox.y, "the error sits below the field").toBeGreaterThanOrEqual(latBox.y + latBox.height);
   await expect(page.getByRole("heading", { name: "Check the coordinates or date above" })).toBeVisible();
   await settle(page);
-  await page.screenshot({ path: screenshotPath("input-error.png"), fullPage: false });
+  await page.screenshot({ path: screenshotPath("input-error.png"), fullPage: false, animations: "disabled" });
 });
 
 test("labels every control and keeps focus visible in red-light mode", async ({ page }) => {
