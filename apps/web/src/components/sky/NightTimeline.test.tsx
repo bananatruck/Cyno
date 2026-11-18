@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { NightTimeline } from "./NightTimeline";
@@ -12,6 +13,22 @@ const first = samples[0];
 const second = samples[1];
 const last = samples.at(-1);
 if (!first || !second || !last) throw new Error("Expected night timeline samples");
+const firstTime = first.time;
+
+function StatefulTimeline({ onTimeChange }: { onTimeChange: (time: string) => void }) {
+  const [time, setTime] = useState(firstTime);
+  return (
+    <NightTimeline
+      plan={night}
+      time={time}
+      selectedId={null}
+      onTimeChange={(next) => {
+        setTime(next);
+        onTimeChange(next);
+      }}
+    />
+  );
+}
 
 describe("NightTimeline", () => {
   it("labels local hours in the plan's zone", () => {
@@ -47,6 +64,57 @@ describe("NightTimeline", () => {
     expect(onTimeChange).toHaveBeenLastCalledWith(new Date(Date.parse(first.time) + 3_600_000).toISOString());
     fireEvent.keyDown(slider, { key: "ArrowLeft" });
     expect(onTimeChange).toHaveBeenLastCalledWith(first.time);
+  });
+  it("uses the latest controlled time for consecutive arrow-key steps", () => {
+    const onTimeChange = vi.fn();
+    render(<StatefulTimeline onTimeChange={onTimeChange} />);
+    const slider = screen.getByRole("slider");
+
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    fireEvent.keyDown(slider, { key: "ArrowLeft" });
+
+    expect(onTimeChange.mock.calls).toEqual([[samples[1]?.time], [samples[2]?.time], [samples[1]?.time]]);
+  });
+  it("steps with vertical arrows and prevents their default scrolling", () => {
+    const onTimeChange = vi.fn();
+    render(<NightTimeline plan={night} time={second.time} selectedId={null} onTimeChange={onTimeChange} />);
+    const slider = screen.getByRole("slider");
+
+    expect(fireEvent.keyDown(slider, { key: "ArrowUp" })).toBe(false);
+    expect(onTimeChange).toHaveBeenLastCalledWith(samples[2]?.time);
+    expect(fireEvent.keyDown(slider, { key: "ArrowDown" })).toBe(false);
+    expect(onTimeChange).toHaveBeenLastCalledWith(first.time);
+  });
+  it("reuses hour ticks when only the selected time changes", () => {
+    const OriginalDateTimeFormat = Intl.DateTimeFormat;
+    const optionsSeen: Intl.DateTimeFormatOptions[] = [];
+    const DateTimeFormatProxy = new Proxy(OriginalDateTimeFormat, {
+      construct(target, args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        optionsSeen.push(args[1] ?? {});
+        return Reflect.construct(target, args);
+      },
+    });
+    Object.defineProperty(Intl, "DateTimeFormat", {
+      configurable: true,
+      value: DateTimeFormatProxy,
+    });
+    try {
+      const { rerender } = render(
+        <NightTimeline plan={night} time={first.time} selectedId={null} onTimeChange={vi.fn()} />,
+      );
+      rerender(<NightTimeline plan={night} time={second.time} selectedId={null} onTimeChange={vi.fn()} />);
+    } finally {
+      Object.defineProperty(Intl, "DateTimeFormat", {
+        configurable: true,
+        value: OriginalDateTimeFormat,
+      });
+    }
+
+    const minuteOnlyFormatterCalls = optionsSeen.filter(
+      (options) => options.minute === "2-digit" && options.hour === undefined,
+    );
+    expect(minuteOnlyFormatterCalls).toHaveLength(1);
   });
   it("snaps pointer scrubbing to the endpoint samples and captures a drag", () => {
     const onTimeChange = vi.fn();

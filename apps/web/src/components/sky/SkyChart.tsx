@@ -1,4 +1,5 @@
 import { useId } from "react";
+import type { MouseEvent } from "react";
 import type { NightPlan, ObjectKind } from "@cyno/engine";
 import { clock, colors, nearest, trackPath, zoneLabel } from "./chart-utils";
 import { project } from "./projection";
@@ -30,6 +31,7 @@ const LABEL_FONT_SIZE = 17;
 const LABEL_GAP = 13;
 const LABEL_PADDING = 2;
 const DOT_PADDING = 2;
+const HIT_RADIUS = 13;
 const LABEL_DIRECTIONS = [
   [0, -1],
   [1, -1],
@@ -198,6 +200,27 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
   const illumination = Math.max(0, Math.min(1, plan.moon.illumination));
   const terminator = Math.abs(1 - 2 * illumination) * 7;
   const waning = plan.moon.phaseName.startsWith("Waning") || plan.moon.phaseName === "Last Quarter";
+  const handlePointerSelection = (event: MouseEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const scale = Math.min(bounds.width / 480, bounds.height / 480);
+    const contentWidth = 480 * scale;
+    const contentHeight = 480 * scale;
+    const chartX = (event.clientX - bounds.left - (bounds.width - contentWidth) / 2) / scale - 240;
+    const chartY = (event.clientY - bounds.top - (bounds.height - contentHeight) / 2) / scale - 240;
+    const closest = visible.reduce<(typeof visible)[number] | undefined>((nearestObject, candidate) => {
+      if (!nearestObject) return candidate;
+      const nearestDistance = Math.hypot(
+        chartX - nearestObject.position.x,
+        chartY - nearestObject.position.y,
+      );
+      const candidateDistance = Math.hypot(chartX - candidate.position.x, chartY - candidate.position.y);
+      return candidateDistance < nearestDistance ? candidate : nearestObject;
+    }, undefined);
+    if (closest && Math.hypot(chartX - closest.position.x, chartY - closest.position.y) <= HIT_RADIUS) {
+      onSelect(closest.object.id);
+    }
+  };
 
   return (
     <figure className={`cyno-sky ${className ?? ""}`} style={{ margin: 0, color: colors.starlight }}>
@@ -206,6 +229,7 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
         width="100%"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-summary`}
+        onClick={handlePointerSelection}
         style={{
           display: "block",
           width: "100%",
@@ -272,7 +296,6 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
               aria-label={label}
               aria-pressed={isSelected}
               className="cyno-sky-object"
-              onClick={() => onSelect(object.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
@@ -280,7 +303,7 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
                 }
               }}
             >
-              <circle r="13" fill="transparent" />
+              <circle r={HIT_RADIUS} fill="transparent" />
               <circle className="cyno-sky-focus" r="11" fill="none" stroke={colors.signal} strokeWidth="2" />
               {isSelected && <circle r="10" fill="none" stroke={colors.signal} strokeWidth="1.5" />}
               {object.kind === "moon" ? (

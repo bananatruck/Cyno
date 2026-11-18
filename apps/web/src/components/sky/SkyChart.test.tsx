@@ -129,10 +129,16 @@ describe("SkyChart", () => {
       const rings = altitudeRingLabelBoxes();
       expect(boxes.length, `${localTime} should have multiple labels`).toBeGreaterThan(1);
       for (const box of boxes) {
-        expect(box.left, `${localTime} ${box.objectName} left edge`).toBeGreaterThanOrEqual(-200);
-        expect(box.right, `${localTime} ${box.objectName} right edge`).toBeLessThanOrEqual(200);
-        expect(box.top, `${localTime} ${box.objectName} top edge`).toBeGreaterThanOrEqual(-200);
-        expect(box.bottom, `${localTime} ${box.objectName} bottom edge`).toBeLessThanOrEqual(200);
+        for (const [corner, x, y] of [
+          ["top-left", box.left, box.top],
+          ["top-right", box.right, box.top],
+          ["bottom-left", box.left, box.bottom],
+          ["bottom-right", box.right, box.bottom],
+        ] as const) {
+          expect(Math.hypot(x, y), `${localTime} ${box.objectName} ${corner}`).toBeLessThanOrEqual(
+            CHART_RADIUS,
+          );
+        }
       }
       for (let index = 0; index < boxes.length; index += 1) {
         for (let other = index + 1; other < boxes.length; other += 1) {
@@ -198,10 +204,60 @@ describe("SkyChart", () => {
     if (!button) throw new Error("Expected object button");
     expect(button.getAttribute("tabindex")).toBe("0");
     expect(button.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(button);
     fireEvent.keyDown(button, { key: "Enter" });
     fireEvent.keyDown(button, { key: " " });
-    expect(onSelect.mock.calls).toEqual([[object.id], [object.id], [object.id]]);
+    expect(onSelect.mock.calls).toEqual([[object.id], [object.id]]);
+  });
+  it("selects the nearest marker when two pointer hit areas overlap", () => {
+    const firstObject = night.objects[0];
+    const secondObject = night.objects[1];
+    const firstPoint = firstObject?.track[0];
+    const secondPoint = secondObject?.track[0];
+    if (!firstObject || !secondObject || !firstPoint || !secondPoint) {
+      throw new Error("Expected two objects with tracks");
+    }
+    const closePlan = {
+      ...night,
+      objects: [
+        {
+          ...firstObject,
+          track: [{ ...firstPoint, time, altDeg: 45, azDeg: 0 }],
+        },
+        {
+          ...secondObject,
+          track: [{ ...secondPoint, time, altDeg: 48.6, azDeg: 0 }],
+        },
+      ],
+    };
+    const onSelect = vi.fn();
+    render(<SkyChart plan={closePlan} time={time} selectedId={null} onSelect={onSelect} />);
+    const svg = document.querySelector("figure > svg");
+    if (!(svg instanceof SVGSVGElement)) throw new Error("Expected the sky chart SVG");
+    vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 480,
+      bottom: 480,
+      width: 480,
+      height: 480,
+      toJSON: () => ({}),
+    });
+    const groups = screen.getAllByRole("button");
+    const centers = groups.map((group) => {
+      const match = group.getAttribute("transform")?.match(/^translate\(([-\d.]+) ([-\d.]+)\)$/);
+      if (!match) throw new Error("Expected marker transform");
+      return { x: Number(match[1]), y: Number(match[2]) };
+    });
+    expect(Math.hypot(centers[0]!.x - centers[1]!.x, centers[0]!.y - centers[1]!.y)).toBeCloseTo(8);
+
+    fireEvent.click(svg, {
+      clientX: centers[0]!.x + 240,
+      clientY: centers[0]!.y + 243,
+    });
+
+    expect(onSelect).toHaveBeenCalledWith(firstObject.id);
   });
   it("renders an empty polar day without a dark window", () => {
     expect(polarDay.objects).toHaveLength(0);

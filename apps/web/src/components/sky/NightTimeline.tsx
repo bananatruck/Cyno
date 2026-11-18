@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import type { Darkness, NightPlan } from "@cyno/engine";
 import { clock, colors, nearest, trackPath, zoneLabel } from "./chart-utils";
@@ -66,15 +66,18 @@ export function NightTimeline({
   const formatter = clock(plan.input.timeZone);
   const hours = clock(plan.input.timeZone, true);
   const timeZoneLabel = zoneLabel(plan.input.timeZone);
-  const ticks: number[] = [];
-  // Find local hour boundaries, including zones with half-hour and quarter-hour offsets.
-  const minuteFormatter = new Intl.DateTimeFormat("en-GB", {
-    timeZone: plan.input.timeZone,
-    minute: "2-digit",
-  });
-  for (let instant = Math.ceil(start / 60_000) * 60_000; instant <= end; instant += 60_000) {
-    if (Number(minuteFormatter.format(new Date(instant))) === 0) ticks.push(instant);
-  }
+  const ticks = useMemo(() => {
+    const result: number[] = [];
+    // Find local hour boundaries, including zones with half-hour and quarter-hour offsets.
+    const minuteFormatter = new Intl.DateTimeFormat("en-GB", {
+      timeZone: plan.input.timeZone,
+      minute: "2-digit",
+    });
+    for (let instant = Math.ceil(start / 60_000) * 60_000; instant <= end; instant += 60_000) {
+      if (Number(minuteFormatter.format(new Date(instant))) === 0) result.push(instant);
+    }
+    return result;
+  }, [start, end, plan.input.timeZone]);
   const choose = (instant: number) => {
     const sample = nearest(samples, instant);
     if (sample) onTimeChange(sample.time);
@@ -89,9 +92,11 @@ export function NightTimeline({
     let target: number;
     switch (event.key) {
       case "ArrowLeft":
+      case "ArrowDown":
         target = Date.parse(samples[Math.max(0, index - 1)]?.time ?? plan.window.start);
         break;
       case "ArrowRight":
+      case "ArrowUp":
         target = Date.parse(samples[Math.min(samples.length - 1, index + 1)]?.time ?? plan.window.end);
         break;
       case "PageUp":
@@ -305,10 +310,10 @@ export function NightTimeline({
         <span>{timeZoneLabel}</span>
       </figcaption>
       <p className="cyno-sky-sr" id={`${id}-help`}>
-        Drag to choose a time. Left and Right move one sample; Page Up and Page Down move one hour; Home and
-        End move to the first and last sample. Silver shows Moon altitude, the selection curve shows object
-        altitude, amber marks its best time, the bracket marks the darkest sky, and top bars show known cloud
-        cover.
+        Drag to choose a time. Left, Down, Right, and Up move one sample; Page Up and Page Down move one hour;
+        Home and End move to the first and last sample. Silver shows Moon altitude, the selection curve shows
+        object altitude, amber marks its best time, the bracket marks the darkest sky, and top bars show known
+        cloud cover.
       </p>
     </figure>
   );
