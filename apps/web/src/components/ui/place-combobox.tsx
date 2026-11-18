@@ -24,12 +24,18 @@ export function PlaceCombobox({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef(new Map<string, HTMLLIElement>());
+  const scrollActiveOption = useRef(false);
   const listboxId = useId();
+  const dialogId = useId();
 
   const filtered = PLACE_PRESETS.filter((preset) =>
     preset.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
+  const optionId = (preset: PlacePreset) => `${listboxId}-option-${PLACE_PRESETS.indexOf(preset)}`;
+  const activeOptionId = filtered[activeIndex] ? optionId(filtered[activeIndex]) : undefined;
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
@@ -41,19 +47,29 @@ export function PlaceCombobox({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
 
-  const choosePreset = (preset: PlacePreset) => {
+  useEffect(() => {
+    if (!scrollActiveOption.current || !activeOptionId) return;
+    scrollActiveOption.current = false;
+    optionRefs.current.get(activeOptionId)?.scrollIntoView({ block: "nearest" });
+  }, [activeOptionId]);
+
+  const choosePreset = (preset: PlacePreset, returnFocus = false) => {
     onSelectPreset(preset);
     setQuery("");
     setOpen(false);
+    if (returnFocus) {
+      buttonRef.current?.focus();
+    }
   };
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <button
+        ref={buttonRef}
         type="button"
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls={listboxId}
+        aria-controls={dialogId}
         aria-label={`Place preset: ${selectedName}`}
         onClick={() => {
           const next = !open;
@@ -76,6 +92,7 @@ export function PlaceCombobox({
 
       {open && (
         <div
+          id={dialogId}
           className="absolute left-0 top-full z-40 mt-1.5 w-64 rounded-xl border border-moonsilver/30 bg-abyss/95 p-2 shadow-xl backdrop-blur-md"
           role="dialog"
           aria-label="Choose a preset place"
@@ -86,6 +103,7 @@ export function PlaceCombobox({
             role="combobox"
             aria-expanded={open}
             aria-controls={listboxId}
+            aria-activedescendant={activeOptionId}
             aria-autocomplete="list"
             aria-label="Filter preset places"
             value={query}
@@ -96,56 +114,65 @@ export function PlaceCombobox({
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
+                scrollActiveOption.current = true;
                 setActiveIndex((i) => (filtered.length ? (i + 1) % filtered.length : 0));
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
+                scrollActiveOption.current = true;
                 setActiveIndex((i) => (filtered.length ? (i - 1 + filtered.length) % filtered.length : 0));
               } else if (e.key === "Enter" && filtered[activeIndex]) {
                 e.preventDefault();
-                choosePreset(filtered[activeIndex]);
+                choosePreset(filtered[activeIndex], true);
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 setOpen(false);
+                buttonRef.current?.focus();
               }
             }}
             placeholder="Search preset places..."
             className="mb-1.5 w-full rounded-lg border border-moonsilver/25 bg-nautical/60 px-2.5 py-1.5 text-[13px] text-starlight placeholder:text-moonsilver/70"
           />
           <ul id={listboxId} role="listbox" aria-label="Preset places" className="max-h-56 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <li className="px-2.5 py-2 text-[13px] text-moonsilver">
-                No matching preset. Enter latitude and longitude directly.
-              </li>
-            ) : (
-              filtered.map((preset, idx) => {
-                const isSelected =
-                  Math.abs(Number(latitude) - preset.latitude) < 0.005 &&
-                  Math.abs(Number(longitude) - preset.longitude) < 0.005;
-                const isHighlighted = idx === activeIndex;
-                return (
-                  <li
-                    key={preset.name}
-                    role="option"
-                    aria-selected={isSelected}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => choosePreset(preset)}
-                    className={cn(
-                      "flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
-                      isHighlighted ? "bg-civil/55 text-starlight" : "text-moonsilver hover:text-starlight",
-                    )}
-                  >
-                    <div>
-                      <div className="font-medium text-starlight">{preset.name}</div>
-                      <div className="tabular-nums text-[12px] text-moonsilver">
-                        {preset.latitude.toFixed(2)}°, {preset.longitude.toFixed(2)}°
-                      </div>
+            {filtered.map((preset, idx) => {
+              const isSelected =
+                Math.abs(Number(latitude) - preset.latitude) < 0.005 &&
+                Math.abs(Number(longitude) - preset.longitude) < 0.005;
+              const isHighlighted = idx === activeIndex;
+              const id = optionId(preset);
+              return (
+                <li
+                  id={id}
+                  ref={(node) => {
+                    if (node) optionRefs.current.set(id, node);
+                    else optionRefs.current.delete(id);
+                  }}
+                  key={preset.name}
+                  role="option"
+                  aria-selected={isSelected}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onClick={() => choosePreset(preset)}
+                  className={cn(
+                    "flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px] transition-colors",
+                    isHighlighted ? "bg-civil/55 text-starlight" : "text-moonsilver hover:text-starlight",
+                  )}
+                >
+                  <div>
+                    <div className="font-medium text-starlight">{preset.name}</div>
+                    <div className="tabular-nums text-[12px] text-moonsilver">
+                      {preset.latitude.toFixed(2)}°, {preset.longitude.toFixed(2)}°
                     </div>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-signal" aria-hidden="true" />}
-                  </li>
-                );
-              })
-            )}
+                  </div>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-signal" aria-hidden="true" />}
+                </li>
+              );
+            })}
           </ul>
+          <div
+            role="status"
+            className={cn("text-[13px] text-moonsilver", filtered.length === 0 && "px-2.5 py-2")}
+          >
+            {filtered.length === 0 ? "No matching preset. Enter latitude and longitude directly." : ""}
+          </div>
         </div>
       )}
     </div>
