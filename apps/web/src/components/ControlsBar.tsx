@@ -1,8 +1,9 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Eye, LocateFixed, SlidersHorizontal } from "lucide-react";
 import type { Equipment, InputError, SkyQuality } from "@cyno/engine";
 import { parsePlanInput } from "@cyno/engine/input";
 import type { PlacePreset } from "@/lib/places";
+import { parseCoordinateText } from "@/lib/urlState";
 import { PlaceCombobox } from "./ui/place-combobox";
 import { SegmentedControl, type SegmentOption } from "./ui/segmented-control";
 import { cn } from "@/lib/utils";
@@ -67,18 +68,16 @@ export function ControlsBar({
   onUseGeoLocation,
   errors,
 }: ControlsBarProps) {
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const geoRequestRef = useRef(0);
   const errorIdPrefix = useId();
   const errorId = (field: FieldWithError) => `${errorIdPrefix}${field}-error`;
 
   const validationErrors = useMemo<InputError[]>(() => {
-    const parsedLat = latText.trim() === "" ? Number.NaN : Number(latText);
-    const parsedLon = lonText.trim() === "" ? Number.NaN : Number(lonText);
     const parsed = parsePlanInput({
-      latitude: parsedLat,
-      longitude: parsedLon,
+      latitude: parseCoordinateText(latText),
+      longitude: parseCoordinateText(lonText),
       date,
       sky,
       equipment,
@@ -86,6 +85,20 @@ export function ControlsBar({
     if (!parsed.ok) return parsed.errors;
     return errors ?? [];
   }, [latText, lonText, date, sky, equipment, errors]);
+
+  const hasValidationErrors = validationErrors.length > 0;
+  const [sheetOpen, setSheetOpen] = useState(hasValidationErrors);
+  const [sheetSawErrors, setSheetSawErrors] = useState(hasValidationErrors);
+  if (hasValidationErrors !== sheetSawErrors) {
+    setSheetSawErrors(hasValidationErrors);
+    if (hasValidationErrors) setSheetOpen(true);
+  }
+
+  /** A location edit supersedes any geolocation request still in flight. */
+  const supersedeGeoRequest = () => {
+    geoRequestRef.current += 1;
+    setLocating(false);
+  };
 
   const latError = validationErrors.find((e) => e.field === "latitude")?.message;
   const lonError = validationErrors.find((e) => e.field === "longitude")?.message;
@@ -104,17 +117,24 @@ export function ControlsBar({
       setGeoStatus("Geolocation is not available in this browser. Choose a preset or enter coordinates.");
       return;
     }
+    const requestId = ++geoRequestRef.current;
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (geoRequestRef.current !== requestId) return;
         setLocating(false);
         const lat = Math.round(pos.coords.latitude * 100) / 100;
         const lon = Math.round(pos.coords.longitude * 100) / 100;
         onUseGeoLocation(lat, lon);
       },
-      () => {
+      (err) => {
+        if (geoRequestRef.current !== requestId) return;
         setLocating(false);
-        setGeoStatus("Location access was denied. Choose a preset or enter coordinates manually.");
+        setGeoStatus(
+          err.code === err.PERMISSION_DENIED
+            ? "Location access was denied. Choose a preset or enter coordinates manually."
+            : "Your location could not be found in time. Choose a preset or enter coordinates manually.",
+        );
       },
       { timeout: 8000 },
     );
@@ -163,17 +183,17 @@ export function ControlsBar({
 
         <div
           id="cyno-controls-sheet"
-          className={cn(
-            "w-full lg:w-auto lg:flex-1",
-            !sheetOpen && validationErrors.length === 0 ? "max-lg:hidden" : "block",
-          )}
+          className={cn("w-full lg:w-auto lg:flex-1", sheetOpen ? "block" : "max-lg:hidden")}
         >
           <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2">
             <PlaceCombobox
               selectedName={placeName}
               latitude={latText}
               longitude={lonText}
-              onSelectPreset={onSelectPreset}
+              onSelectPreset={(preset) => {
+                supersedeGeoRequest();
+                onSelectPreset(preset);
+              }}
             />
 
             <button
@@ -196,7 +216,10 @@ export function ControlsBar({
                   aria-invalid={Boolean(latError)}
                   aria-describedby={latError ? errorId("latitude") : undefined}
                   value={latText}
-                  onChange={(e) => onLatChange(e.target.value)}
+                  onChange={(e) => {
+                    supersedeGeoRequest();
+                    onLatChange(e.target.value);
+                  }}
                   className={cn(
                     "w-19 rounded-full border bg-nautical/65 px-2 py-1 text-[13px] tabular-nums text-starlight",
                     latError ? "border-horizon" : "border-moonsilver/25",
@@ -212,7 +235,10 @@ export function ControlsBar({
                   aria-invalid={Boolean(lonError)}
                   aria-describedby={lonError ? errorId("longitude") : undefined}
                   value={lonText}
-                  onChange={(e) => onLonChange(e.target.value)}
+                  onChange={(e) => {
+                    supersedeGeoRequest();
+                    onLonChange(e.target.value);
+                  }}
                   className={cn(
                     "w-21 rounded-full border bg-nautical/65 px-2 py-1 text-[13px] tabular-nums text-starlight",
                     lonError ? "border-horizon" : "border-moonsilver/25",

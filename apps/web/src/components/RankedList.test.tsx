@@ -29,12 +29,37 @@ describe("RankedList", () => {
 
     expect(firstObject.factors).toHaveLength(6);
     for (const factor of firstObject.factors) {
-      expect(within(reasoningRegion).getByText(factor.label)).toBeTruthy();
-      expect(within(reasoningRegion).getByText(factor.value)).toBeTruthy();
-      expect(within(reasoningRegion).getByText(factor.detail)).toBeTruthy();
-      const signed = formatSignedPoints(factor.points);
-      expect(within(reasoningRegion).getAllByText(signed).length).toBeGreaterThan(0);
+      const term = within(reasoningRegion).getByText(factor.label, { selector: "dt" });
+      const group = term.closest<HTMLElement>("dl > div");
+      if (!group) throw new Error(`Expected ${factor.label} to sit in its own group`);
+      expect(within(group).getByRole("definition").textContent).toBe(formatSignedPoints(factor.points));
+      expect(within(group).getByText(factor.value)).toBeTruthy();
+      expect(within(group).getByText(factor.detail)).toBeTruthy();
+      expect(group.textContent).toBe(
+        `${factor.label}${formatSignedPoints(factor.points)}${factor.value}${factor.detail}`,
+      );
     }
+  });
+
+  it("switches the filter to All when the selection moves outside it", () => {
+    const planet = samplePlan.objects.find((object) => object.kind === "planet")!;
+    const star = samplePlan.objects.find((object) => object.kind === "star")!;
+    const { rerender } = render(<RankedList plan={samplePlan} selectedId={null} onSelect={() => {}} />);
+    const chips = screen.getByRole("group", { name: "Filter objects by category" });
+    const all = within(chips).getByRole("button", { name: /^All/ });
+    const stars = within(chips).getByRole("button", { name: /^Stars/ });
+
+    fireEvent.click(stars);
+    rerender(<RankedList plan={samplePlan} selectedId={star.id} onSelect={() => {}} />);
+    expect(stars.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("region", { name: `${star.name} visibility reasoning` })).toBeTruthy();
+
+    rerender(<RankedList plan={samplePlan} selectedId={planet.id} onSelect={() => {}} />);
+    expect(all.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("region", { name: `${planet.name} visibility reasoning` })).toBeTruthy();
+
+    fireEvent.click(stars);
+    expect(stars.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("shows the visible window and Moon distance as separate lines, without middle dots", () => {

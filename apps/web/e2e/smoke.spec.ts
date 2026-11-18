@@ -6,14 +6,34 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const screenshotsDir = path.resolve(__dirname, "../../../docs/screenshots");
 const OPEN_METEO = "https://api.open-meteo.com/**";
-const LONG_BEACH = "/?lat=33.77&lon=-118.19&date=2026-11-17&sky=suburban&eq=eye";
+const PLAN_DATE = "2026-11-17";
+const LONG_BEACH = `/?lat=33.77&lon=-118.19&date=${PLAN_DATE}&sky=suburban&eq=eye`;
 
 test.beforeAll(() => {
   fs.mkdirSync(screenshotsDir, { recursive: true });
 });
 
+test.beforeEach(async ({ page }) => {
+  // The forecast window and the default date both follow "today", so pin it to the plan date.
+  await page.clock.setFixedTime(new Date(`${PLAN_DATE}T20:00:00Z`));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+});
+
 function screenshotPath(name: string) {
   return path.join(screenshotsDir, name);
+}
+
+/** Waits until web fonts are loaded and every finite animation or transition has finished. */
+async function settle(page: Page) {
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== "running" || animation.effect?.getComputedTiming().endTime === Infinity,
+      ),
+  );
 }
 
 async function box(locator: Locator) {
@@ -76,24 +96,23 @@ test("without a cloud forecast, lays out desktop and phone honestly and saves sc
 
   expect(await page.locator("body").innerText()).not.toContain("\u00b7");
 
-  await page.waitForTimeout(650);
+  await settle(page);
   await page.screenshot({ path: screenshotPath("desktop.png"), fullPage: false });
 
   const redLightButton = page.getByRole("button", { name: "Red light" });
   await redLightButton.click();
   await expect(page.locator("html")).toHaveAttribute("data-mode", "red");
-  await page.waitForTimeout(250);
+  await settle(page);
   await page.screenshot({ path: screenshotPath("red-light.png"), fullPage: false });
   await redLightButton.click();
   await expect(page.locator("html")).not.toHaveAttribute("data-mode", "red");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(300);
+  const summary = page.locator('button[aria-controls="cyno-controls-sheet"]');
+  await expect(summary).toBeVisible();
   await expect(reasoningRegion).toBeVisible();
   expect(await nestedScrollRegions(page), "no nested scroll regions on a phone").toEqual([]);
 
-  const summary = page.locator('button[aria-controls="cyno-controls-sheet"]');
-  await expect(summary).toBeVisible();
   const summaryLines = summary.locator(":scope > span > span");
   await expect(summaryLines).toHaveText(["Long Beach, CA", "2026-11-17, Suburban sky, Eye"]);
   for (const line of await summaryLines.all()) {
@@ -102,13 +121,51 @@ test("without a cloud forecast, lays out desktop and phone honestly and saves sc
     expect((await line.boundingBox())?.height, "summary line stays on one line").toBeLessThan(26);
   }
 
+  await settle(page);
   await page.screenshot({ path: screenshotPath("phone.png"), fullPage: true });
 });
 
+test("keeps the sky chart usable in a short desktop window and lets the page scroll", async ({ page }) => {
+  await page.route(OPEN_METEO, (route) => route.abort());
+  await page.setViewportSize({ width: 1280, height: 380 });
+  await page.goto(LONG_BEACH);
+
+  const chart = page.getByRole("region", { name: "Tonight's sky" }).locator("figure > svg");
+  await expect(chart).toBeVisible();
+  const bounds = await box(chart);
+  expect(bounds.width, "chart keeps a usable width").toBeGreaterThanOrEqual(260);
+  expect(Math.abs(bounds.width - bounds.height), "chart is square").toBeLessThan(1.5);
+
+  const timeline = page.getByRole("region", { name: "Night sky timeline" });
+  await timeline.scrollIntoViewIfNeeded();
+  await expect(timeline).toBeInViewport();
+  expect(await page.evaluate(() => window.scrollY), "the page scrolls to reach the timeline").toBeGreaterThan(
+    0,
+  );
+});
+
+test("keeps an empty or non-decimal latitude from the URL invalid after a reload", async ({ page }) => {
+  await page.route(OPEN_METEO, (route) => route.abort());
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const latitude = page.getByLabel("Latitude");
+  const latitudeError = page.getByRole("alert");
+
+  for (const rawLat of ["", "0x21"]) {
+    await page.goto(`/?lat=${rawLat}&lon=-118.19&date=${PLAN_DATE}&sky=suburban&eq=eye`);
+    await expect(latitudeError).toHaveText("Latitude must be between -90° and 90°.");
+    await expect(latitude).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByRole("heading", { name: "Check the coordinates or date above" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Tonight's verdict" })).toHaveCount(0);
+
+    await page.reload();
+    await expect(latitudeError).toHaveText("Latitude must be between -90° and 90°.");
+    await expect(page.getByRole("region", { name: "Tonight's verdict" })).toHaveCount(0);
+  }
+});
+
 test("uses a mocked Open-Meteo forecast for the clouds factor", async ({ page }) => {
-  const today = new Date().toISOString().slice(0, 10);
   await page.route(OPEN_METEO, async (route) => {
-    const start = Date.parse(`${today}T00:00:00Z`);
+    const start = Date.parse(`${PLAN_DATE}T00:00:00Z`);
     const time = Array.from({ length: 48 }, (_, hour) =>
       new Date(start + hour * 3_600_000).toISOString().slice(0, 16),
     );
@@ -119,7 +176,7 @@ test("uses a mocked Open-Meteo forecast for the clouds factor", async ({ page })
     });
   });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(`/?lat=33.77&lon=-118.19&date=${today}&sky=suburban&eq=eye`);
+  await page.goto(LONG_BEACH);
 
   const verdict = page.getByRole("region", { name: "Tonight's verdict" });
   await expect(verdict.getByRole("status", { name: "Cloud forecast" })).toHaveText(
@@ -155,14 +212,14 @@ test("explains polar day in Tromso on 2026-06-21", async ({ page }) => {
   );
   const timeline = await box(page.getByRole("region", { name: "Night sky timeline" }));
   expect(timeline.y + timeline.height, "timeline fits in a 1440x900 viewport").toBeLessThanOrEqual(900);
-  await page.waitForTimeout(650);
+  await settle(page);
   await page.screenshot({ path: screenshotPath("polar-day.png"), fullPage: false });
 });
 
 test("shows the latitude error for latitude 95", async ({ page }) => {
   await page.route(OPEN_METEO, (route) => route.abort());
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?lat=45&lon=0&date=2026-11-17");
+  await page.goto(`/?lat=45&lon=0&date=${PLAN_DATE}`);
   const header = page.locator("header");
   const latitude = page.getByLabel("Latitude");
   await expect(page.getByRole("region", { name: "Tonight's verdict" })).toBeVisible();
@@ -181,7 +238,7 @@ test("shows the latitude error for latitude 95", async ({ page }) => {
   const alertBox = await box(alert);
   expect(alertBox.y, "the error sits below the field").toBeGreaterThanOrEqual(latBox.y + latBox.height);
   await expect(page.getByRole("heading", { name: "Check the coordinates or date above" })).toBeVisible();
-  await page.waitForTimeout(300);
+  await settle(page);
   await page.screenshot({ path: screenshotPath("input-error.png"), fullPage: false });
 });
 
@@ -191,23 +248,15 @@ test("labels every control and keeps focus visible in red-light mode", async ({ 
   await page.goto(LONG_BEACH);
   await expect(page.getByRole("region", { name: "Ranked observable objects" })).toBeVisible();
 
-  const unlabelled = await page.evaluate(() =>
-    Array.from(
-      document.querySelectorAll<HTMLElement>("button, input, select, [role='slider'], [role='button']"),
-    )
-      .filter((control) => control.getClientRects().length > 0)
-      .filter((control) => {
-        const labels = (control as HTMLInputElement).labels;
-        const name =
-          control.getAttribute("aria-label") ||
-          control.getAttribute("aria-labelledby") ||
-          (labels && labels.length > 0 ? labels[0]?.textContent : "") ||
-          control.textContent;
-        return !name?.trim();
-      })
-      .map((control) => control.outerHTML.slice(0, 120)),
-  );
-  expect(unlabelled).toEqual([]);
+  const controls = page.locator("button, input, select, [role='slider'], [role='button']");
+  expect(await controls.count()).toBeGreaterThan(0);
+  for (const control of await controls.all()) {
+    if (!(await control.isVisible())) continue;
+    await expect(
+      control,
+      (await control.evaluate((element) => element.outerHTML)).slice(0, 120),
+    ).toHaveAccessibleName(/\S/);
+  }
 
   const highlights = page.getByRole("group", { name: "Tonight's highlights" }).getByRole("button");
   for (const button of await highlights.all()) await expect(button).toHaveAttribute("aria-pressed", /.+/);

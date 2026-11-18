@@ -31,7 +31,8 @@ function formatVerdictWord(label: VerdictLabel): string {
 
 export function VerdictBanner({ plan, placeName, weatherStatus = "ok" }: VerdictBannerProps) {
   const verdictWord = formatVerdictWord(plan.verdict.label);
-  const roundedScore = Math.round(plan.verdict.score);
+  // Rounding could lift a score into the next band (64.8 would read as the Go threshold, 65).
+  const shownScore = Math.floor(plan.verdict.score);
   const isNoGo = plan.verdict.label === "no-go";
   const summary = isNoGo ? null : formatDarkAndMoonSummary(plan);
   const otherReasons = isNoGo ? [] : reasonsBesideDarkAndMoon(plan.verdict.reasons);
@@ -44,7 +45,7 @@ export function VerdictBanner({ plan, placeName, weatherStatus = "ok" }: Verdict
         <h1 className="m-0 flex items-baseline gap-2 font-display text-[34px] leading-none font-normal tracking-tight text-starlight md:text-[44px]">
           <BlurText text={verdictWord} animateBy="letters" delay={35} />
           <NumberTicker
-            value={roundedScore}
+            value={shownScore}
             className="font-display text-[34px] font-normal tracking-tight text-starlight md:text-[44px]"
           />
         </h1>

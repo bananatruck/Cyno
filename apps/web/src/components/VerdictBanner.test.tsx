@@ -1,11 +1,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { planNight } from "@cyno/engine";
 import { formatDarkAndMoonSummary } from "@/lib/format";
 import { VerdictBanner } from "./VerdictBanner";
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 const longBeach = planNight({
@@ -83,6 +84,25 @@ describe("VerdictBanner", () => {
     const note = screen.getByRole("region", { name: "Sky condition note" });
     expect(note.textContent).toContain("closer to the equator");
     expect(note.textContent).not.toMatch(/south|north|autumn/i);
+  });
+
+  it.each([
+    [64.8, "marginal", "Marginal", "64"],
+    [34.9, "no-go", "No-go", "34"],
+  ] as const)("keeps a score of %d inside its verdict band", (score, label, word, shown) => {
+    // Reduced motion makes the score ticker show its final value at once.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    const plan = { ...longBeach, verdict: { ...longBeach.verdict, score, label } };
+    render(<VerdictBanner plan={plan} placeName="Long Beach, CA" weatherStatus="offline" />);
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toContain(word);
+    expect(heading.textContent).toContain(shown);
+    expect(heading.textContent).not.toContain(String(Math.round(score)));
   });
 
   it("carries the anchor that the ranked list's empty state links to", () => {

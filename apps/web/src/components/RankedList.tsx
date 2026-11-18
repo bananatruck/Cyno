@@ -46,6 +46,13 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
   const [filter, setFilter] = useState<ObjectFilterCategory>("all");
   const [hiddenSearch, setHiddenSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [filteredSelectionId, setFilteredSelectionId] = useState(selectedId);
+
+  if (selectedId !== filteredSelectionId) {
+    setFilteredSelectionId(selectedId);
+    const selected = plan.objects.find((obj) => obj.id === selectedId);
+    if (selected && filter !== "all" && categorizeKind(selected.kind) !== filter) setFilter("all");
+  }
 
   const counts = useMemo(() => {
     const result = {

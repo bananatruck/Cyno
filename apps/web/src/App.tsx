@@ -6,59 +6,12 @@ import { RankedList } from "@/components/RankedList";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { ShootingStars } from "@/components/ui/shooting-stars";
 import { StarsBackground } from "@/components/ui/stars-background";
-import { DEFAULT_PLACE, findMatchingPreset, todayInPlaceTimeZone, type PlacePreset } from "@/lib/places";
+import type { PlacePreset } from "@/lib/places";
+import { coordinatePlaceName, parseCoordinateText, readUrlState } from "@/lib/urlState";
 import { usePlan } from "@/lib/usePlan";
 
 const RED_MODE_STORAGE_KEY = "cyno:red-mode";
 const TIMELINE_HEIGHT = 112;
-
-interface UrlState {
-  latText: string;
-  lonText: string;
-  date: string;
-  sky: SkyQuality;
-  equipment: Equipment;
-  placeName: string;
-}
-
-function readInitialUrlState(): UrlState {
-  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const rawLat = params.get("lat");
-  const rawLon = params.get("lon");
-  const latNum = rawLat !== null && rawLat.trim() !== "" ? Number(rawLat) : DEFAULT_PLACE.latitude;
-  const lonNum = rawLon !== null && rawLon.trim() !== "" ? Number(rawLon) : DEFAULT_PLACE.longitude;
-
-  const latText = rawLat !== null && rawLat.trim() !== "" ? rawLat : String(DEFAULT_PLACE.latitude);
-  const lonText = rawLon !== null && rawLon.trim() !== "" ? rawLon : String(DEFAULT_PLACE.longitude);
-
-  const defaultDate = todayInPlaceTimeZone(
-    Number.isFinite(latNum) ? latNum : DEFAULT_PLACE.latitude,
-    Number.isFinite(lonNum) ? lonNum : DEFAULT_PLACE.longitude,
-  );
-  const date = params.get("date") || defaultDate;
-
-  const rawSky = params.get("sky");
-  const sky: SkyQuality =
-    rawSky === "city" || rawSky === "suburban" || rawSky === "rural" || rawSky === "dark"
-      ? rawSky
-      : "suburban";
-
-  const rawEq = params.get("eq");
-  const equipment: Equipment =
-    rawEq === "eye" || rawEq === "binoculars" || rawEq === "telescope" ? rawEq : "eye";
-
-  const explicitName = params.get("name")?.trim();
-  const matchedPreset =
-    Number.isFinite(latNum) && Number.isFinite(lonNum) ? findMatchingPreset(latNum, lonNum) : undefined;
-  const placeName =
-    explicitName ||
-    matchedPreset?.name ||
-    (Number.isFinite(latNum) && Number.isFinite(lonNum)
-      ? `${latNum.toFixed(2)}°, ${lonNum.toFixed(2)}°`
-      : DEFAULT_PLACE.name);
-
-  return { latText, lonText, date, sky, equipment, placeName };
-}
 
 function readInitialRedMode(): boolean {
   try {
@@ -80,7 +33,10 @@ function defaultSelectedTime(plan: NightPlan): string {
 }
 
 export default function App() {
-  const initial = useMemo(() => readInitialUrlState(), []);
+  const initial = useMemo(
+    () => readUrlState(typeof window !== "undefined" ? window.location.search : ""),
+    [],
+  );
   const [latText, setLatText] = useState(initial.latText);
   const [lonText, setLonText] = useState(initial.lonText);
   const [date, setDate] = useState(initial.date);
@@ -121,19 +77,27 @@ export default function App() {
     window.history.replaceState(null, "", nextUrl);
   }, [latText, lonText, date, sky, equipment, placeName]);
 
-  const rawPlanInput = useMemo(() => {
-    const latitude = latText.trim() === "" ? Number.NaN : Number(latText);
-    const longitude = lonText.trim() === "" ? Number.NaN : Number(lonText);
-    return {
-      latitude,
-      longitude,
+  const rawPlanInput = useMemo(
+    () => ({
+      latitude: parseCoordinateText(latText),
+      longitude: parseCoordinateText(lonText),
       date,
       sky,
       equipment,
-    };
-  }, [latText, lonText, date, sky, equipment]);
+    }),
+    [latText, lonText, date, sky, equipment],
+  );
 
-  const { plan, status, errors, isWorkerError, weatherStatus, retry } = usePlan(rawPlanInput);
+  const {
+    plan: currentPlan,
+    status,
+    errors,
+    isWorkerError,
+    weatherStatus,
+    stalePlan,
+    retry,
+  } = usePlan(rawPlanInput, placeName);
+  const plan = currentPlan ?? stalePlan?.plan ?? null;
 
   const planIdentity = plan
     ? `${plan.input.latitude}:${plan.input.longitude}:${plan.input.date}:${plan.input.sky}:${plan.input.equipment}`
@@ -180,32 +144,17 @@ export default function App() {
     setLonText(String(preset.longitude));
   };
 
-  const handleLatChange = (val: string) => {
-    setLatText(val);
-    const latNum = Number(val);
-    const lonNum = Number(lonText);
-    if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
-      const match = findMatchingPreset(latNum, lonNum);
-      setPlaceName(match ? match.name : `${latNum.toFixed(2)}°, ${lonNum.toFixed(2)}°`);
-    }
+  const updateCoordinates = (nextLatText: string, nextLonText: string) => {
+    setLatText(nextLatText);
+    setLonText(nextLonText);
+    const latNum = parseCoordinateText(nextLatText);
+    const lonNum = parseCoordinateText(nextLonText);
+    if (Number.isFinite(latNum) && Number.isFinite(lonNum)) setPlaceName(coordinatePlaceName(latNum, lonNum));
   };
 
-  const handleLonChange = (val: string) => {
-    setLonText(val);
-    const latNum = Number(latText);
-    const lonNum = Number(val);
-    if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
-      const match = findMatchingPreset(latNum, lonNum);
-      setPlaceName(match ? match.name : `${latNum.toFixed(2)}°, ${lonNum.toFixed(2)}°`);
-    }
-  };
-
-  const handleUseGeoLocation = (lat: number, lon: number) => {
-    setLatText(String(lat));
-    setLonText(String(lon));
-    const match = findMatchingPreset(lat, lon);
-    setPlaceName(match ? match.name : `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`);
-  };
+  const handleLatChange = (val: string) => updateCoordinates(val, lonText);
+  const handleLonChange = (val: string) => updateCoordinates(latText, val);
+  const handleUseGeoLocation = (lat: number, lon: number) => updateCoordinates(String(lat), String(lon));
 
   return (
     <div id="top" className="relative min-h-screen bg-abyss text-starlight">
@@ -269,6 +218,17 @@ export default function App() {
           </div>
         )}
 
+        {!currentPlan && status === "computing" && stalePlan && (
+          <p
+            role="status"
+            aria-label="Updating night plan"
+            className="mb-2.5 rounded-xl border border-moonsilver/20 bg-nautical/50 px-3 py-1.5 text-[13px] text-moonsilver"
+          >
+            Computing the plan for {placeName}, {date}. Showing {stalePlan.label}, {stalePlan.plan.input.date}{" "}
+            until it is ready.
+          </p>
+        )}
+
         {!plan && status === "computing" && (
           <div
             role="status"
@@ -297,8 +257,13 @@ export default function App() {
               aria-label="Tonight's sky"
               className="order-1 rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-3 backdrop-blur-md lg:col-span-7 lg:[--chart-reserve:385px] lg:has-data-verdict-note:[--chart-reserve:475px]"
             >
-              <VerdictBanner plan={plan} placeName={placeName} weatherStatus={weatherStatus} />
-              <div className="mx-auto w-[min(100%,62vh,calc(100vh-var(--chart-reserve,0px)))]">
+              <VerdictBanner
+                plan={plan}
+                placeName={currentPlan ? placeName : (stalePlan?.label ?? placeName)}
+                weatherStatus={currentPlan ? weatherStatus : (stalePlan?.weatherStatus ?? weatherStatus)}
+              />
+              {/* The floor keeps the chart usable in short windows; the page scrolls instead. */}
+              <div className="mx-auto w-[max(min(100%,260px),min(100%,62vh,calc(100vh-var(--chart-reserve,0px))))]">
                 <SkyChart
                   plan={plan}
                   time={activeTime}
