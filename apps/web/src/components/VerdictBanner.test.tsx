@@ -53,6 +53,11 @@ describe("VerdictBanner", () => {
     expect(screen.getByRole("status", { name: "Cloud forecast" }).textContent).toBe(
       "Open-Meteo cloud forecast in use.",
     );
+    cleanup();
+    render(<VerdictBanner plan={longBeach} placeName="Long Beach, CA" weatherStatus="partial" />);
+    expect(screen.getByRole("status", { name: "Cloud forecast" }).textContent).toBe(
+      "Cloud forecast covers part of the night.",
+    );
   });
 
   it("shows the polar-day explanation and every verdict reason for Tromso on 2026-06-21", () => {

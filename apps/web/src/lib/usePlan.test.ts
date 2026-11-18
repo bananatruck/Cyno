@@ -27,7 +27,7 @@ const forecast = vi.mocked(fetchCloudForecast);
 /** Stands in for the module worker; requests wait until flush() unless auto is set. */
 class FakeWorker {
   static instances: FakeWorker[] = [];
-  static behaviour: "auto" | "manual" | "fail-to-start" = "auto";
+  static behaviour: "auto" | "manual" | "fail-to-start" | "throw-on-construct" = "auto";
   onmessage: ((event: MessageEvent<WorkerResponse>) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
   queue: WorkerRequest[] = [];
@@ -35,6 +35,9 @@ class FakeWorker {
   readonly behaviour = FakeWorker.behaviour;
 
   constructor() {
+    if (this.behaviour === "throw-on-construct") {
+      throw new DOMException("Workers are not allowed here", "SecurityError");
+    }
     FakeWorker.instances.push(this);
     if (this.behaviour === "fail-to-start") {
       setTimeout(() => this.onerror?.(new ErrorEvent("error", { message: "Failed to load worker script" })));
@@ -117,6 +120,30 @@ describe("usePlan without a worker", () => {
     expect(result.current.status).toBe("ready");
     expect(result.current.plan).not.toBeNull();
   });
+
+  it("does not report a forecast that only covers daylight as in use", async () => {
+    forecast.mockResolvedValue({
+      samples: [{ time: "2026-11-17T20:00:00.000Z", percent: 40 }],
+      status: "ok",
+    });
+    const { result } = renderHook(() => usePlan(LONG_BEACH, "Long Beach, CA"));
+    await waitFor(() => expect(result.current.plan?.input.cloudCover).toBeTruthy());
+    const timeline = result.current.plan!.timeline;
+    const covered = timeline.filter((sample) => sample.cloudPercent !== null);
+    expect(covered.length).toBeGreaterThan(0);
+    expect(covered.every((sample) => sample.sunAltDeg >= -0.833)).toBe(true);
+    expect(result.current.weatherStatus).toBe("unavailable");
+  });
+
+  it("reports a forecast that covers only some dark samples as partial", async () => {
+    forecast.mockResolvedValue({ samples: NIGHT_CLOUDS.slice(0, 12), status: "ok" });
+    const { result } = renderHook(() => usePlan(LONG_BEACH, "Long Beach, CA"));
+    await waitFor(() => expect(result.current.plan?.input.cloudCover).toBeTruthy());
+    const dark = result.current.plan!.timeline.filter((sample) => sample.sunAltDeg < -0.833);
+    expect(dark.some((sample) => sample.cloudPercent !== null)).toBe(true);
+    expect(dark.some((sample) => sample.cloudPercent === null)).toBe(true);
+    expect(result.current.weatherStatus).toBe("partial");
+  });
 });
 
 describe("usePlan with a worker", () => {
@@ -163,6 +190,17 @@ describe("usePlan with a worker", () => {
     rerender({ input: TOKYO, label: "Tokyo" });
     await waitFor(() => expect(result.current.plan?.input.latitude).toBe(35.68), { timeout: 5000 });
     expect(FakeWorker.instances).toHaveLength(2);
+  });
+
+  it("falls back to the main thread when the Worker constructor throws a SecurityError", async () => {
+    FakeWorker.behaviour = "throw-on-construct";
+    forecast.mockResolvedValue({ samples: NIGHT_CLOUDS, status: "ok" });
+    const { result } = renderHook(() => usePlan(LONG_BEACH, "Long Beach, CA"));
+    await waitFor(() => expect(result.current.weatherStatus).toBe("ok"), { timeout: 5000 });
+    expect(result.current.status).toBe("ready");
+    expect(result.current.isWorkerError).toBe(false);
+    expect(result.current.plan?.input.cloudCover).not.toBeNull();
+    expect(FakeWorker.instances).toHaveLength(0);
   });
 
   it("never shows the previous location's plan as the current one", async () => {

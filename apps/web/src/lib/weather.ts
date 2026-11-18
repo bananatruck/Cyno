@@ -2,6 +2,9 @@ import type { CloudSample } from "@cyno/engine";
 
 export type WeatherStatus = "ok" | "offline" | "unavailable" | "out-of-range";
 
+/** What the shown plan makes of the forecast: "partial" when it covers only some of the dark hours. */
+export type ForecastStatus = WeatherStatus | "loading" | "partial";
+
 export interface WeatherResult {
   samples: CloudSample[];
   status: WeatherStatus;
