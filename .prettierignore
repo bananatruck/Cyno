@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+**/dist/**
+**/node_modules/**
+packages/engine/src/data/catalog.json
+packages/engine/test/fixtures/raw/**
+design/mockups/**
+docs/screenshots/**
+GPTPlan.md
+GeminiPlan.md
