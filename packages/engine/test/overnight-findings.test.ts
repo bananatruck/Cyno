@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { Body, MakeTime, Observer } from "astronomy-engine";
+import { Body, Illumination, MakeTime, Observer } from "astronomy-engine";
 import { parsePlanInput, planNight, PlanInputError } from "../src/index";
 import { moonInfo, MOON_RISE_SET_ALT_DEG } from "../src/sky";
-import {
-  addCalendarDays,
-  cloudAt,
-  cloudAtParsed,
-  HOUR,
-  localNoon,
-  nightWindow,
-  parseCloudCover,
-} from "../src/time";
+import { addCalendarDays, cloudAtParsed, HOUR, localNoon, nightWindow, parseCloudCover } from "../src/time";
 import { bodyPosition } from "../src/positions";
+import { horizons } from "./helpers";
 
 const DATE_MSG = "Enter a date between 1800-01-01 and 2200-12-31.";
 
@@ -127,16 +120,37 @@ describe("finding 7: skyGetsDark vs condition at coarse steps", () => {
 });
 
 describe("finding 6 unit: parsed cloud cover", () => {
-  it("matches linear scan for edge cases", () => {
-    const samples = [
+  it("returns literal percents within the hour, then null past expiry or in gaps", () => {
+    const parsed = parseCloudCover([
       { time: "2026-11-18T05:00:00.000Z", percent: 80 },
       { time: "2026-11-18T08:00:00.000Z", percent: 40 },
-    ];
-    const parsed = parseCloudCover(samples);
-    const t = Date.parse("2026-11-18T07:30:00.000Z");
-    expect(cloudAtParsed(t, parsed)).toBe(cloudAt(t, samples));
-    expect(cloudAtParsed(t + HOUR, parsed)).toBe(cloudAt(t + HOUR, samples));
+    ]);
+    expect(cloudAtParsed(Date.parse("2026-11-18T05:00:00.000Z"), parsed)).toBe(80);
+    expect(cloudAtParsed(Date.parse("2026-11-18T05:59:59.999Z"), parsed)).toBe(80);
+    expect(cloudAtParsed(Date.parse("2026-11-18T06:00:00.000Z"), parsed)).toBeNull();
+    expect(cloudAtParsed(Date.parse("2026-11-18T07:30:00.000Z"), parsed)).toBeNull();
+    expect(cloudAtParsed(Date.parse("2026-11-18T08:00:00.000Z"), parsed)).toBe(40);
+    expect(cloudAtParsed(Date.parse("2026-11-18T08:30:00.000Z"), parsed)).toBe(40);
+    expect(cloudAtParsed(Date.parse("2026-11-18T09:00:00.000Z"), parsed)).toBeNull();
   });
+});
+
+/** Horizons APmag tolerance documented in docs/SPEC.md (0.1 mag for positions; same allowance for magnitudes). */
+const HORIZONS_MAG_TOLERANCE = 0.1;
+
+describe("finding 9: Horizons APmag references", () => {
+  for (const [file, body] of [
+    ["hz_299.txt", Body.Venus],
+    ["hz_499.txt", Body.Mars],
+    ["hz_599.txt", Body.Jupiter],
+    ["hz_699.txt", Body.Saturn],
+  ] as const) {
+    for (const row of horizons(file))
+      it(`${body} APmag at ${row.time} matches Horizons`, () => {
+        const engineMag = Illumination(body, MakeTime(new Date(row.time))).mag;
+        expect(Math.abs(engineMag - row.apMag)).toBeLessThanOrEqual(HORIZONS_MAG_TOLERANCE);
+      });
+  }
 });
 
 describe("finding 4: read plan fields once for validation", () => {
