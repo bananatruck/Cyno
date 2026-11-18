@@ -43,4 +43,25 @@ describe("ControlsBar", () => {
     const alert = screen.getByRole("alert");
     expect(alert.textContent).toBe("Latitude must be between -90° and 90°.");
   });
+
+  it("summarises the place on one line and the full date, sky and equipment on a second line", () => {
+    render(<ControlsHarness />);
+    const summary = screen
+      .getAllByRole("button", { expanded: false })
+      .find((button) => button.getAttribute("aria-controls") === "cyno-controls-sheet");
+    if (!summary) throw new Error("Expected the controls summary button");
+    const lines = Array.from(summary.querySelectorAll(":scope > span > span"), (line) => line.textContent);
+    expect(lines).toEqual(["Long Beach, CA", "2026-11-17, Suburban sky, Eye"]);
+    expect(summary.querySelector(".truncate")).toBeNull();
+  });
+
+  it("gives every control a label", () => {
+    render(<ControlsHarness />);
+    for (const control of document.querySelectorAll("button, input")) {
+      const name =
+        control.getAttribute("aria-label") ??
+        ((control as HTMLInputElement).labels?.[0]?.textContent || control.textContent);
+      expect(name?.trim(), control.outerHTML).toBeTruthy();
+    }
+  });
 });

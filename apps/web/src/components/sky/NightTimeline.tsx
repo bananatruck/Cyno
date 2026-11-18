@@ -10,6 +10,8 @@ export interface NightTimelineProps {
   onTimeChange: (iso: string) => void;
   selectedId: string | null;
   className?: string;
+  /** Rendered height of the strip in pixels, including the hour labels. */
+  height?: number;
 }
 
 const skyColors = {
@@ -23,8 +25,17 @@ const HOUR = 3_600_000;
 const WIDTH = 800;
 const TOP = 12;
 const BOTTOM = 116;
+const VIEW_HEIGHT = 148;
+const LABEL_TOP = 130;
 
-export function NightTimeline({ plan, time, onTimeChange, selectedId, className }: NightTimelineProps) {
+export function NightTimeline({
+  plan,
+  time,
+  onTimeChange,
+  selectedId,
+  className,
+  height = VIEW_HEIGHT,
+}: NightTimelineProps) {
   const id = useId();
   const windowStart = Date.parse(plan.window.start);
   const windowEnd = Date.parse(plan.window.end);
@@ -157,9 +168,9 @@ export function NightTimeline({ plan, time, onTimeChange, selectedId, className 
         style={{ position: "relative", touchAction: "none", cursor: "ew-resize", borderRadius: 8 }}
       >
         <svg
-          viewBox="0 0 800 148"
+          viewBox={`0 0 ${WIDTH} ${VIEW_HEIGHT}`}
           width="100%"
-          height="148"
+          height={height}
           preserveAspectRatio="none"
           aria-hidden="true"
           style={{ display: "block", overflow: "visible" }}
@@ -257,7 +268,7 @@ export function NightTimeline({ plan, time, onTimeChange, selectedId, className 
           aria-hidden="true"
           style={{
             position: "absolute",
-            inset: "130px 0 auto",
+            inset: `${(height * LABEL_TOP) / VIEW_HEIGHT}px 0 auto`,
             height: 18,
             fontSize: 13,
             fontVariantNumeric: "tabular-nums",

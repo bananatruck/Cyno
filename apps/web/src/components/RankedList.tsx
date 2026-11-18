@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChevronDown, Search, Sparkles } from "lucide-react";
 import type { NightPlan, ObjectKind, RankedObject } from "@cyno/engine";
 import { formatObjectKind, formatSignedPoints, formatTimeHHMM } from "@/lib/format";
@@ -15,6 +15,8 @@ export function categorizeKind(kind: ObjectKind): Exclude<ObjectFilterCategory, 
   return "deep-sky";
 }
 
+const INITIAL_SHOWN = 10;
+
 export interface RankedListProps {
   plan: NightPlan;
   selectedId: string | null;
@@ -22,8 +24,11 @@ export interface RankedListProps {
 }
 
 export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
+  const idPrefix = useId();
+  const reasoningId = (objectId: string) => `${idPrefix}reasoning-${objectId.replace(/[^\w-]/g, "-")}`;
   const [filter, setFilter] = useState<ObjectFilterCategory>("all");
   const [hiddenSearch, setHiddenSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   const counts = useMemo(() => {
     const result = {
@@ -55,6 +60,11 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
     return plan.objects.filter((obj) => categorizeKind(obj.kind) === filter);
   }, [plan.objects, filter]);
 
+  const selectedIndex = filteredObjects.findIndex((obj) => obj.id === selectedId);
+  const shownCount = showAll ? filteredObjects.length : Math.max(INITIAL_SHOWN, selectedIndex + 1);
+  const shownObjects = filteredObjects.slice(0, shownCount);
+  const moreCount = filteredObjects.length - shownObjects.length;
+
   const filteredHidden = useMemo(() => {
     const q = hiddenSearch.trim().toLowerCase();
     if (!q) return plan.hidden;
@@ -75,7 +85,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
   ];
 
   return (
-    <section aria-label="Ranked observable objects" className="flex flex-col gap-2">
+    <section aria-label="Ranked observable objects" className="flex flex-col gap-2 lg:h-full lg:min-h-0">
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="m-0 font-display text-[22px] leading-tight font-normal text-starlight">
@@ -91,6 +101,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
 
       {highlights.length > 0 && (
         <div
+          role="group"
           aria-label="Tonight's highlights"
           className="rounded-xl border border-moonsilver/20 bg-nautical/40 px-2.5 py-2"
         >
@@ -119,7 +130,8 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                     {object.name}
                   </span>
                   <span className="text-[11px] tabular-nums text-horizon">
-                    Best {formatTimeHHMM(object.best.time, plan.input.timeZone)} · {Math.round(object.score)}
+                    Best at {formatTimeHHMM(object.best.time, plan.input.timeZone)}, score{" "}
+                    {Math.round(object.score)}
                   </span>
                 </button>
               );
@@ -155,157 +167,171 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
         })}
       </div>
 
-      {filteredObjects.length === 0 ? (
-        <div className="rounded-xl border border-moonsilver/20 bg-nautical/35 p-3.5 text-[14px] text-moonsilver">
-          {plan.objects.length === 0 ? (
-            <p className="m-0">
-              No catalog objects pass the visibility threshold tonight. Try switching to a darker sky preset,
-              choosing binoculars or a telescope, or picking another date.
-            </p>
-          ) : (
-            <p className="m-0">
-              No objects in this category tonight. Switch the filter above to see the other{" "}
-              {plan.objects.length} visible objects.
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="flex max-h-[345px] flex-col gap-1.5 overflow-y-auto pr-1">
-          {filteredObjects.map((object) => {
-            const isSelected = object.id === selectedId;
-            const visibleWindow = `Visible ${formatTimeHHMM(object.visibleFrom, plan.input.timeZone)} to ${formatTimeHHMM(object.visibleTo, plan.input.timeZone)}`;
-            const moonSepText =
-              object.moonSeparationDeg === null
-                ? "The Moon itself"
-                : `${Math.round(object.moonSeparationDeg)}° from the Moon`;
+      <div className="flex flex-col gap-2 lg:-mr-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2 [&_:focus-visible]:-outline-offset-2">
+        {filteredObjects.length === 0 ? (
+          <div className="rounded-xl border border-moonsilver/20 bg-nautical/35 p-3.5 text-[14px] text-moonsilver">
+            {plan.objects.length === 0 ? (
+              <p className="m-0">
+                No catalog objects pass the visibility threshold tonight. Try switching to a darker sky
+                preset, choosing binoculars or a telescope, or picking another date.
+              </p>
+            ) : (
+              <p className="m-0">
+                No objects in this category tonight. Switch the filter above to see the other{" "}
+                {plan.objects.length} visible objects.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {shownObjects.map((object) => {
+              const isSelected = object.id === selectedId;
+              const visibleWindow = `Visible ${formatTimeHHMM(object.visibleFrom, plan.input.timeZone)} to ${formatTimeHHMM(object.visibleTo, plan.input.timeZone)}`;
+              const moonSepText =
+                object.moonSeparationDeg === null
+                  ? "The Moon itself"
+                  : `${Math.round(object.moonSeparationDeg)}° from the Moon`;
 
-            return (
-              <SpotlightCard
-                key={object.id}
-                className={cn(
-                  "transition-colors",
-                  isSelected
-                    ? "border-signal/75 bg-nautical/75"
-                    : "border-moonsilver/20 bg-nautical/40 hover:border-moonsilver/40",
-                )}
-              >
-                {isSelected && <BorderBeam size={80} duration={8} />}
-                <button
-                  type="button"
-                  aria-expanded={isSelected}
-                  onClick={() => onSelect(object.id)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left"
+              return (
+                <SpotlightCard
+                  key={object.id}
+                  className={cn(
+                    "transition-colors",
+                    isSelected
+                      ? "border-signal/75 bg-nautical/75"
+                      : "border-moonsilver/20 bg-nautical/40 hover:border-moonsilver/40",
+                  )}
                 >
-                  <div className="flex min-w-0 flex-col">
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="w-5 text-[14px] tabular-nums text-moonsilver">{object.rank}</span>
-                      <span className="font-display text-[20px] leading-none text-starlight">
-                        {object.name}
-                      </span>
-                      <span className="text-[12px] text-moonsilver">{formatObjectKind(object.kind)}</span>
-                    </div>
-                    <p className="m-0 mt-0.5 pl-7 text-[12px] leading-snug text-moonsilver">
-                      {object.summary}
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 flex-col items-end">
-                    <NumberTicker
-                      value={Math.round(object.score)}
-                      className="font-sans text-[20px] leading-none font-medium tabular-nums text-starlight"
-                    />
-                    <span className="mt-0.5 text-[11px] text-moonsilver">visibility score</span>
-                  </div>
-                </button>
-
-                {isSelected && (
-                  <div
-                    role="region"
-                    aria-label={`${object.name} visibility reasoning`}
-                    className="border-t border-moonsilver/20 px-3 pt-1.5 pb-2 text-[12px]"
+                  {isSelected && <BorderBeam size={80} duration={8} />}
+                  <button
+                    type="button"
+                    aria-expanded={isSelected}
+                    aria-controls={isSelected ? reasoningId(object.id) : undefined}
+                    onClick={() => onSelect(object.id)}
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2 text-left"
                   >
-                    <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums text-moonsilver">
-                      <span>{visibleWindow}</span>
-                      <span>·</span>
-                      <span>{moonSepText}</span>
+                    <div className="flex min-w-0 flex-col">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="w-5 text-[14px] tabular-nums text-moonsilver">{object.rank}</span>
+                        <span className="font-display text-[20px] leading-none text-starlight">
+                          {object.name}
+                        </span>
+                        <span className="text-[12px] text-moonsilver">{formatObjectKind(object.kind)}</span>
+                      </div>
+                      <p className="m-0 mt-0.5 pl-7 text-[12px] leading-snug text-moonsilver">
+                        {object.summary}
+                      </p>
                     </div>
 
-                    <dl className="m-0 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {object.factors.map((factor) => (
-                        <div
-                          key={factor.key}
-                          className="rounded-lg border border-moonsilver/15 bg-abyss/45 px-2 py-1"
-                        >
-                          <div className="flex items-baseline justify-between gap-1.5">
-                            <dt className="font-medium text-starlight">{factor.label}</dt>
-                            <dd className="m-0 font-medium tabular-nums text-signal">
-                              {formatSignedPoints(factor.points)}
-                            </dd>
-                          </div>
-                          <div className="text-[11px] leading-tight tabular-nums text-moonsilver">
-                            {factor.value}
-                          </div>
-                          <div className="text-[11px] leading-tight text-moonsilver/80">{factor.detail}</div>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                )}
-              </SpotlightCard>
-            );
-          })}
-        </div>
-      )}
+                    <div className="flex shrink-0 flex-col items-end">
+                      <NumberTicker
+                        value={Math.round(object.score)}
+                        className="font-sans text-[20px] leading-none font-medium tabular-nums text-starlight"
+                      />
+                      <span className="mt-0.5 text-[11px] text-moonsilver">visibility score</span>
+                    </div>
+                  </button>
 
-      <details className="group rounded-xl border border-moonsilver/20 bg-nautical/35">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-1.5 text-[13px] font-medium text-moonsilver hover:text-starlight">
-          <span>Not visible tonight ({plan.hidden.length})</span>
-          <ChevronDown
-            className="h-3.5 w-3.5 text-moonsilver transition-transform group-open:rotate-180"
-            aria-hidden="true"
-          />
-        </summary>
-        <div className="border-t border-moonsilver/15 px-3 py-2.5">
-          <div className="relative mb-2">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-moonsilver"
+                  {isSelected && (
+                    <div
+                      id={reasoningId(object.id)}
+                      role="region"
+                      aria-label={`${object.name} visibility reasoning`}
+                      className="border-t border-moonsilver/20 px-3 pt-1.5 pb-2 text-[12px]"
+                    >
+                      <div className="mb-1.5 flex flex-col tabular-nums text-moonsilver">
+                        <p className="m-0">{visibleWindow}</p>
+                        <p className="m-0">{moonSepText}</p>
+                      </div>
+
+                      <dl className="m-0 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        {object.factors.map((factor) => (
+                          <div
+                            key={factor.key}
+                            className="rounded-lg border border-moonsilver/15 bg-abyss/45 px-2 py-1"
+                          >
+                            <div className="flex items-baseline justify-between gap-1.5">
+                              <dt className="font-medium text-starlight">{factor.label}</dt>
+                              <dd className="m-0 font-medium tabular-nums text-signal">
+                                {formatSignedPoints(factor.points)}
+                              </dd>
+                            </div>
+                            <div className="text-[11px] leading-tight tabular-nums text-moonsilver">
+                              {factor.value}
+                            </div>
+                            <div className="text-[11px] leading-tight text-moonsilver/80">
+                              {factor.detail}
+                            </div>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  )}
+                </SpotlightCard>
+              );
+            })}
+            {moreCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="cursor-pointer rounded-xl border border-moonsilver/20 bg-nautical/35 px-3 py-1.5 text-[13px] font-medium text-moonsilver transition-colors hover:border-signal/45 hover:text-starlight"
+              >
+                Show {moreCount} more {moreCount === 1 ? "object" : "objects"}
+              </button>
+            )}
+          </div>
+        )}
+
+        <details className="group rounded-xl border border-moonsilver/20 bg-nautical/35">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-1.5 text-[13px] font-medium text-moonsilver hover:text-starlight">
+            <span>Not visible tonight ({plan.hidden.length})</span>
+            <ChevronDown
+              className="h-3.5 w-3.5 text-moonsilver transition-transform group-open:rotate-180"
               aria-hidden="true"
             />
-            <input
-              type="search"
-              aria-label="Search not visible objects"
-              placeholder="Search not visible objects..."
-              value={hiddenSearch}
-              onChange={(e) => setHiddenSearch(e.target.value)}
-              className="w-full rounded-full border border-moonsilver/25 bg-abyss/65 py-1 pr-3 pl-8 text-[13px] text-starlight placeholder:text-moonsilver/70"
-            />
-          </div>
+          </summary>
+          <div className="border-t border-moonsilver/15 px-3 py-2.5">
+            <div className="relative mb-2">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-moonsilver"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                aria-label="Search not visible objects"
+                placeholder="Search not visible objects..."
+                value={hiddenSearch}
+                onChange={(e) => setHiddenSearch(e.target.value)}
+                className="w-full rounded-full border border-moonsilver/25 bg-abyss/65 py-1 pr-3 pl-8 text-[13px] text-starlight placeholder:text-moonsilver/70"
+              />
+            </div>
 
-          {filteredHidden.length === 0 ? (
-            <p className="m-0 text-[13px] text-moonsilver">
-              No hidden objects match &ldquo;{hiddenSearch}&rdquo;.
-            </p>
-          ) : (
-            <ul
-              aria-label="Objects not visible tonight"
-              className="m-0 flex max-h-52 list-none flex-col gap-1.5 overflow-y-auto p-0 text-[12px]"
-            >
-              {filteredHidden.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex flex-col justify-between gap-0.5 rounded-lg border border-moonsilver/10 bg-abyss/40 px-2.5 py-1.5 sm:flex-row sm:items-baseline sm:gap-3"
-                >
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-display text-[15px] text-starlight">{item.name}</span>
-                    <span className="text-[11px] text-moonsilver">{formatObjectKind(item.kind)}</span>
-                  </div>
-                  <span className="text-moonsilver">{item.reason}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </details>
+            {filteredHidden.length === 0 ? (
+              <p className="m-0 text-[13px] text-moonsilver">
+                No hidden objects match &ldquo;{hiddenSearch}&rdquo;.
+              </p>
+            ) : (
+              <ul
+                aria-label="Objects not visible tonight"
+                className="m-0 flex list-none flex-col gap-1.5 p-0 text-[12px]"
+              >
+                {filteredHidden.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex flex-col justify-between gap-0.5 rounded-lg border border-moonsilver/10 bg-abyss/40 px-2.5 py-1.5 sm:flex-row sm:items-baseline sm:gap-3"
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-display text-[15px] text-starlight">{item.name}</span>
+                      <span className="text-[11px] text-moonsilver">{formatObjectKind(item.kind)}</span>
+                    </div>
+                    <span className="text-moonsilver">{item.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </details>
+      </div>
     </section>
   );
 }

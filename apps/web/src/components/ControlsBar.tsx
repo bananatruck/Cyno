@@ -19,6 +19,10 @@ const EQUIPMENT_OPTIONS: readonly SegmentOption<Equipment>[] = [
   { value: "telescope", label: "Telescope" },
 ];
 
+function optionLabel<T extends string>(options: readonly SegmentOption<T>[], value: T): string {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
 export interface ControlsBarProps {
   placeName: string;
   latText: string;
@@ -110,35 +114,36 @@ export function ControlsBar({
           Cyno
         </a>
 
-        <div className="flex items-center gap-2 lg:hidden">
-          <button
-            type="button"
-            aria-expanded={sheetOpen}
-            aria-controls="cyno-controls-sheet"
-            onClick={() => setSheetOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-moonsilver/30 bg-nautical/65 px-3 py-1 text-[13px] text-moonsilver transition-colors hover:border-signal/55 hover:text-starlight"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5 text-signal" aria-hidden="true" />
-            <span className="max-w-[190px] truncate">
-              {placeName}, {date}, {sky}, {equipment}
-            </span>
-          </button>
+        <button
+          type="button"
+          aria-pressed={redMode}
+          onClick={onToggleRedMode}
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1 text-[13px] font-medium transition-colors lg:order-last",
+            redMode
+              ? "border-signal bg-nautical text-starlight"
+              : "border-moonsilver/30 bg-nautical/65 text-moonsilver hover:border-signal/55 hover:text-starlight",
+          )}
+        >
+          <Eye className="h-3.5 w-3.5 text-signal" aria-hidden="true" />
+          <span>Red light</span>
+        </button>
 
-          <button
-            type="button"
-            aria-pressed={redMode}
-            onClick={onToggleRedMode}
-            className={cn(
-              "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-medium transition-colors",
-              redMode
-                ? "border-signal bg-nautical text-starlight"
-                : "border-moonsilver/30 bg-nautical/65 text-moonsilver hover:border-signal/55 hover:text-starlight",
-            )}
-          >
-            <Eye className="h-3.5 w-3.5 text-signal" aria-hidden="true" />
-            <span>Red light</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-expanded={sheetOpen}
+          aria-controls="cyno-controls-sheet"
+          onClick={() => setSheetOpen((prev) => !prev)}
+          className="flex w-full items-center gap-2.5 rounded-2xl border border-moonsilver/30 bg-nautical/65 px-3 py-1.5 text-left text-[13px] leading-snug text-moonsilver transition-colors hover:border-signal/55 hover:text-starlight lg:hidden"
+        >
+          <SlidersHorizontal className="h-4 w-4 shrink-0 text-signal" aria-hidden="true" />
+          <span className="flex min-w-0 flex-col">
+            <span className="font-display text-[17px] leading-tight text-starlight">{placeName}</span>
+            <span className="tabular-nums">
+              {date}, {optionLabel(SKY_OPTIONS, sky)} sky, {optionLabel(EQUIPMENT_OPTIONS, equipment)}
+            </span>
+          </span>
+        </button>
 
         <div
           id="cyno-controls-sheet"
@@ -248,23 +253,6 @@ export function ControlsBar({
               {geoStatus}
             </p>
           )}
-        </div>
-
-        <div className="hidden items-center lg:flex">
-          <button
-            type="button"
-            aria-pressed={redMode}
-            onClick={onToggleRedMode}
-            className={cn(
-              "inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1 text-[13px] font-medium transition-colors",
-              redMode
-                ? "border-signal bg-nautical text-starlight"
-                : "border-moonsilver/30 bg-nautical/65 text-moonsilver hover:border-signal/55 hover:text-starlight",
-            )}
-          >
-            <Eye className="h-3.5 w-3.5 text-signal" aria-hidden="true" />
-            <span>Red light</span>
-          </button>
         </div>
       </div>
     </header>

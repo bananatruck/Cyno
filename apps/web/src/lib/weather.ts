@@ -43,16 +43,12 @@ export function mapOpenMeteoToCloudSamples(body: unknown): CloudSample[] {
       continue;
     }
     const percent = Math.max(0, Math.min(100, rawCloud));
-    const utcStr = rawTime.endsWith("Z")
-      ? rawTime
-      : `${rawTime}:00.000Z`.replace(/:00:00\.000Z$/, ":00.000Z");
     const parsedMs = Date.parse(rawTime.endsWith("Z") ? rawTime : `${rawTime}Z`);
     if (!Number.isFinite(parsedMs)) continue;
     samples.push({
       time: new Date(parsedMs).toISOString(),
       percent,
     });
-    void utcStr;
   }
   return samples;
 }

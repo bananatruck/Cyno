@@ -10,6 +10,7 @@ import { DEFAULT_PLACE, findMatchingPreset, todayInPlaceTimeZone, type PlacePres
 import { usePlan } from "@/lib/usePlan";
 
 const RED_MODE_STORAGE_KEY = "cyno:red-mode";
+const TIMELINE_HEIGHT = 112;
 
 interface UrlState {
   latText: string;
@@ -292,9 +293,12 @@ export default function App() {
 
         {plan && (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-            <div className="order-1 flex flex-col justify-start rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-3 backdrop-blur-md lg:col-span-7 lg:order-1">
+            <section
+              aria-label="Tonight's sky"
+              className="order-1 rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-3 backdrop-blur-md lg:col-span-7 lg:[--chart-reserve:385px] lg:has-data-verdict-note:[--chart-reserve:475px]"
+            >
               <VerdictBanner plan={plan} placeName={placeName} weatherStatus={weatherStatus} />
-              <div className="mx-auto flex w-full flex-1 items-center justify-center [&_svg]:mx-auto [&_svg]:max-h-[440px] [&_svg]:w-auto">
+              <div className="mx-auto w-[min(100%,62vh,calc(100vh-var(--chart-reserve,0px)))]">
                 <SkyChart
                   plan={plan}
                   time={activeTime}
@@ -303,22 +307,25 @@ export default function App() {
                   className="w-full"
                 />
               </div>
-            </div>
+            </section>
 
             <section
               aria-label="Night sky timeline"
-              className="order-2 rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-2.5 backdrop-blur-md lg:col-span-12 lg:order-3"
+              className="order-2 rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-2 backdrop-blur-md lg:order-3 lg:col-span-12"
             >
               <NightTimeline
                 plan={plan}
                 time={activeTime}
                 onTimeChange={handleTimeChange}
                 selectedId={selectedId}
+                height={TIMELINE_HEIGHT}
               />
             </section>
 
-            <div className="order-3 rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-3 backdrop-blur-md lg:col-span-5 lg:order-2">
-              <RankedList plan={plan} selectedId={selectedId} onSelect={handleSelectObject} />
+            <div className="order-3 lg:relative lg:order-2 lg:col-span-5">
+              <div className="rounded-2xl border border-moonsilver/20 bg-nautical/35 px-4 py-3 backdrop-blur-md lg:absolute lg:inset-0 lg:flex lg:flex-col">
+                <RankedList plan={plan} selectedId={selectedId} onSelect={handleSelectObject} />
+              </div>
             </div>
           </div>
         )}
