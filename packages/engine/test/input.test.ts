@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parsePlanInput, planNight, PlanInputError, resolveTimeZone } from "../src/index";
 import type { InputError } from "../src/types";
 const valid = { latitude: 33.77, longitude: -118.19, date: "2026-11-17" };
@@ -79,4 +79,34 @@ it("accepts inclusive field boundaries and fractional steps", () => {
       expect(parsePlanInput({ ...valid, latitude, longitude, stepMinutes: 1, cloudCover: [] }).ok).toBe(true);
   expect(parsePlanInput({ ...valid, stepMinutes: 60 }).ok).toBe(true);
   expect(parsePlanInput({ ...valid, stepMinutes: (1 + 60) / 2 }).ok).toBe(true);
+  for (const elevationMeters of [-500, 10000])
+    expect(parsePlanInput({ ...valid, elevationMeters }).ok).toBe(true);
+  expect(() => planNight({ ...valid, elevationMeters: -500 })).not.toThrow();
+});
+it.each([-500.5, 10000.5, -Infinity])(
+  "rejects elevation %d just outside the accepted range",
+  (elevationMeters) => {
+    const result = parsePlanInput({ ...valid, elevationMeters });
+    expect(result).toEqual({
+      ok: false,
+      errors: [{ field: "elevationMeters", message: "Elevation must be between -500 and 10000 metres." }],
+    });
+  },
+);
+it("keeps the input module free of astronomy-engine", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../src/input.ts", import.meta.url), "utf8");
+  expect(source).not.toMatch(/from\s+["']astronomy-engine["']/);
+});
+
+describe("elevation range", () => {
+  const base = { latitude: 33.77, longitude: -118.19, date: "2026-11-17", timeZone: "America/Los_Angeles" };
+  it("plans at the highest accepted elevation", () => {
+    expect(() => planNight({ ...base, elevationMeters: 10000 })).not.toThrow();
+  });
+  it("rejects elevations above any ground observer as an input error, not a crash", () => {
+    const result = parsePlanInput({ ...base, elevationMeters: 50000 });
+    expect(result.ok).toBe(false);
+    expect(() => planNight({ ...base, elevationMeters: 50000 })).toThrow(PlanInputError);
+  });
 });

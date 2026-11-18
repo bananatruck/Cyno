@@ -1,4 +1,3 @@
-import { Atmosphere } from "astronomy-engine";
 import tzLookup from "@photostructure/tz-lookup";
 import type { CloudSample, InputError, ParseResult, PlanInput, ResolvedInput } from "./types";
 
@@ -43,15 +42,13 @@ export function parsePlanInput(raw: unknown): ParseResult {
       error("timeZone", "Enter a known IANA time zone.");
     }
   }
-  if (r.elevationMeters !== undefined) {
-    try {
-      if (!finite(r.elevationMeters)) throw new Error();
-      // SearchRiseSet calls Atmosphere, whose documented range is -500..100000 m.
-      Atmosphere(r.elevationMeters);
-    } catch {
-      error("elevationMeters", "Elevation must be between -500 and 100000 metres.");
-    }
-  }
+  // Ground observers only: astronomy-engine's rise and set refraction fails above about 43 km, and
+  // 10 km is already above the highest mountain.
+  if (
+    r.elevationMeters !== undefined &&
+    (!finite(r.elevationMeters) || r.elevationMeters < -500 || r.elevationMeters > 10000)
+  )
+    error("elevationMeters", "Elevation must be between -500 and 10000 metres.");
   if (
     r.equipment !== undefined &&
     r.equipment !== "eye" &&

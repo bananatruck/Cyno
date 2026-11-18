@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Offline observability engine: what can I see tonight, ranked, with the reasoning shown.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./input": "./src/input.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

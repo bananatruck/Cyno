@@ -83,7 +83,7 @@ Reasons are plain sentences, for example "Dark from 18:15 to 05:20 (11.1 hours).
 
 ## Input handling
 
-Latitude outside -90..90, longitude outside -180..180, non-numbers, a malformed or impossible date, an unknown time zone, equipment or sky, a step outside 1..60, and cloud values outside 0..100 are input errors with a field and a message.
+Latitude outside -90..90, longitude outside -180..180, non-numbers, a malformed or impossible date, an unknown time zone, equipment or sky, a step outside 1..60, an elevation outside -500..10000 metres (astronomy-engine's rise and set refraction fails above about 43 km), and cloud values outside 0..100 are input errors with a field and a message.
 Polar day, polar night and nights without full darkness are normal results with their `condition`, never errors.
 
 ## Web app
