@@ -29,6 +29,17 @@ const CHART_RADIUS = 200;
 const LABEL_FONT_SIZE = 17;
 const LABEL_GAP = 13;
 const LABEL_PADDING = 2;
+const DOT_PADDING = 2;
+const LABEL_DIRECTIONS = [
+  [0, -1],
+  [1, -1],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [-1, -1],
+] as const;
 
 interface LabelBox {
   left: number;
@@ -64,6 +75,19 @@ function overlaps(first: LabelBox, second: LabelBox) {
   );
 }
 
+function boxOverlapsCircle(box: LabelBox, centerX: number, centerY: number, radius: number) {
+  const closestX = Math.max(box.left, Math.min(centerX, box.right));
+  const closestY = Math.max(box.top, Math.min(centerY, box.bottom));
+  return Math.hypot(centerX - closestX, centerY - closestY) < radius;
+}
+
+function altitudeRingLabelBoxes(): LabelBox[] {
+  return [30, 60].map((alt) => {
+    const y = (-CHART_RADIUS * (90 - alt)) / 90 + 14;
+    return labelBox(`${alt}°`, 5, y, "start");
+  });
+}
+
 function insideChart(box: LabelBox) {
   return [
     [box.left, box.top],
@@ -73,17 +97,63 @@ function insideChart(box: LabelBox) {
   ].every(([x, y]) => Math.hypot(x ?? 0, y ?? 0) <= CHART_RADIUS);
 }
 
-function placeLabel(name: string, x: number, y: number, occupied: readonly LabelBox[]) {
+interface DotObstacle {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
+}
+
+function dotRadius(kind: ObjectKind, magnitude: number) {
+  return kind === "moon" ? 7 : Math.max(2.5, Math.min(6, 4.5 - magnitude * 0.5));
+}
+
+function clearPlacement(
+  box: LabelBox,
+  occupied: readonly LabelBox[],
+  dots: readonly DotObstacle[],
+  objectId: string,
+) {
+  if (!insideChart(box)) return false;
+  if (!occupied.every((placed) => !overlaps(box, placed))) return false;
+  return dots.every(
+    (dot) => dot.id === objectId || !boxOverlapsCircle(box, dot.x, dot.y, dot.r + DOT_PADDING),
+  );
+}
+
+function labelCandidates(x: number, y: number, distances: readonly number[]) {
   const centeredBaseline = y + LABEL_FONT_SIZE * 0.4;
-  const candidates: Omit<LabelPlacement, "box">[] = [
-    { x: x + LABEL_GAP, y: centeredBaseline, textAnchor: "start" },
-    { x: x - LABEL_GAP, y: centeredBaseline, textAnchor: "end" },
-    { x, y: y - LABEL_GAP, textAnchor: "middle" },
-    { x, y: y + LABEL_GAP + LABEL_FONT_SIZE, textAnchor: "middle" },
-  ];
-  for (const candidate of candidates) {
+  const candidates: Omit<LabelPlacement, "box">[] = [];
+  for (const distance of distances) {
+    for (const [unitX, unitY] of LABEL_DIRECTIONS) {
+      const length = Math.hypot(unitX, unitY);
+      const offsetX = (unitX / length) * distance;
+      const offsetY = (unitY / length) * distance;
+      const textAnchor: LabelPlacement["textAnchor"] =
+        offsetX > distance * 0.25 ? "start" : offsetX < -distance * 0.25 ? "end" : "middle";
+      candidates.push({
+        x: x + offsetX,
+        y: centeredBaseline + offsetY,
+        textAnchor,
+      });
+    }
+  }
+  return candidates;
+}
+
+function placeLabel(
+  name: string,
+  x: number,
+  y: number,
+  occupied: readonly LabelBox[],
+  dots: readonly DotObstacle[],
+  objectId: string,
+  required: boolean,
+) {
+  const distances = required ? [LABEL_GAP, LABEL_GAP * 2, LABEL_GAP * 3] : [LABEL_GAP, LABEL_GAP * 2];
+  for (const candidate of labelCandidates(x, y, distances)) {
     const box = labelBox(name, candidate.x, candidate.y, candidate.textAnchor);
-    if (insideChart(box) && occupied.every((placed) => !overlaps(box, placed))) {
+    if (clearPlacement(box, occupied, dots, objectId)) {
       return { ...candidate, box };
     }
   }
@@ -98,14 +168,28 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
     return point && position ? [{ object, point, position }] : [];
   });
   const selected = plan.objects.find((object) => object.id === selectedId);
+  const dotObstacles: DotObstacle[] = visible.map(({ object, position }) => ({
+    id: object.id,
+    x: position.x,
+    y: position.y,
+    r: dotRadius(object.kind, object.magnitude),
+  }));
   const labelPlacements = new Map<string, LabelPlacement>();
-  const occupied: LabelBox[] = [];
+  const occupied: LabelBox[] = [...altitudeRingLabelBoxes()];
   for (const { object, position } of [...visible].sort((first, second) => {
     if (first.object.id === selectedId) return -1;
     if (second.object.id === selectedId) return 1;
     return first.object.rank - second.object.rank;
   })) {
-    const placement = placeLabel(object.name, position.x, position.y, occupied);
+    const placement = placeLabel(
+      object.name,
+      position.x,
+      position.y,
+      occupied,
+      dotObstacles,
+      object.id,
+      object.id === selectedId,
+    );
     if (placement) {
       labelPlacements.set(object.id, placement);
       occupied.push(placement.box);

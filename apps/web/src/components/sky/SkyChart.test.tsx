@@ -6,6 +6,58 @@ import { night, polarDay } from "./test-plans";
 
 afterEach(cleanup);
 const time = "2026-11-18T05:03:00.000Z";
+const CHART_RADIUS = 200;
+const LABEL_FONT_SIZE = 17;
+const DOT_PADDING = 2;
+
+function boxOverlapsCircle(
+  box: { left: number; right: number; top: number; bottom: number },
+  centerX: number,
+  centerY: number,
+  radius: number,
+) {
+  const closestX = Math.max(box.left, Math.min(centerX, box.right));
+  const closestY = Math.max(box.top, Math.min(centerY, box.bottom));
+  return Math.hypot(centerX - closestX, centerY - closestY) < radius;
+}
+
+function altitudeRingLabelBoxes() {
+  return [30, 60].map((alt) => {
+    const y = (-CHART_RADIUS * (90 - alt)) / 90 + 14;
+    const name = `${alt}°`;
+    const width = name.length * LABEL_FONT_SIZE * 0.6;
+    return {
+      name,
+      left: 5,
+      right: 5 + width,
+      top: y - LABEL_FONT_SIZE,
+      bottom: y + LABEL_FONT_SIZE * 0.2,
+    };
+  });
+}
+
+function renderedObjectDots() {
+  return Array.from(document.querySelectorAll<SVGGElement>('[role="button"]')).map((group) => {
+    const transform = group.getAttribute("transform") ?? "";
+    const match = transform.match(/^translate\(([-\d.]+) ([-\d.]+)\)$/);
+    if (!match) throw new Error(`Unexpected object transform: ${transform}`);
+    const x = Number(match[1]);
+    const y = Number(match[2]);
+    const label = group.querySelector("text");
+    const dot = Array.from(group.querySelectorAll("circle")).find((circle) => {
+      const fill = circle.getAttribute("fill");
+      const r = Number(circle.getAttribute("r"));
+      return fill && fill !== "transparent" && fill !== "none" && r <= 8;
+    });
+    if (!dot) throw new Error(`Expected a visible dot for ${label?.textContent ?? "object"}`);
+    return {
+      name: label?.textContent ?? null,
+      x,
+      y,
+      radius: Number(dot.getAttribute("r")),
+    };
+  });
+}
 
 function renderedLabelBoxes() {
   return Array.from(document.querySelectorAll<SVGTextElement>('[role="button"] > text')).map((label) => {
@@ -21,7 +73,7 @@ function renderedLabelBoxes() {
     const anchor = label.getAttribute("text-anchor");
     const left = anchor === "end" ? x - width : anchor === "middle" ? x - width / 2 : x;
     return {
-      name: label.textContent,
+      objectName: label.textContent,
       left,
       right: left + width,
       top: baseline - fontSize,
@@ -73,12 +125,14 @@ describe("SkyChart", () => {
         />,
       );
       const boxes = renderedLabelBoxes();
+      const dots = renderedObjectDots();
+      const rings = altitudeRingLabelBoxes();
       expect(boxes.length, `${localTime} should have multiple labels`).toBeGreaterThan(1);
       for (const box of boxes) {
-        expect(box.left, `${localTime} ${box.name} left edge`).toBeGreaterThanOrEqual(-200);
-        expect(box.right, `${localTime} ${box.name} right edge`).toBeLessThanOrEqual(200);
-        expect(box.top, `${localTime} ${box.name} top edge`).toBeGreaterThanOrEqual(-200);
-        expect(box.bottom, `${localTime} ${box.name} bottom edge`).toBeLessThanOrEqual(200);
+        expect(box.left, `${localTime} ${box.objectName} left edge`).toBeGreaterThanOrEqual(-200);
+        expect(box.right, `${localTime} ${box.objectName} right edge`).toBeLessThanOrEqual(200);
+        expect(box.top, `${localTime} ${box.objectName} top edge`).toBeGreaterThanOrEqual(-200);
+        expect(box.bottom, `${localTime} ${box.objectName} bottom edge`).toBeLessThanOrEqual(200);
       }
       for (let index = 0; index < boxes.length; index += 1) {
         for (let other = index + 1; other < boxes.length; other += 1) {
@@ -90,7 +144,22 @@ describe("SkyChart", () => {
             first.right > second.left &&
             first.top < second.bottom &&
             first.bottom > second.top;
-          expect(overlaps, `${localTime}: ${first.name} overlaps ${second.name}`).toBe(false);
+          expect(overlaps, `${localTime}: ${first.objectName} overlaps ${second.objectName}`).toBe(false);
+        }
+      }
+      for (const box of boxes) {
+        for (const dot of dots) {
+          if (dot.name === box.objectName) continue;
+          const hitsDot = boxOverlapsCircle(box, dot.x, dot.y, dot.radius + DOT_PADDING);
+          expect(hitsDot, `${localTime}: ${box.objectName} overlaps dot ${dot.name}`).toBe(false);
+        }
+        for (const ring of rings) {
+          const overlapsRing =
+            box.left < ring.right && box.right > ring.left && box.top < ring.bottom && box.bottom > ring.top;
+          expect(
+            overlapsRing,
+            `${localTime}: ${box.objectName} overlaps altitude ring label ${ring.name}`,
+          ).toBe(false);
         }
       }
     }
