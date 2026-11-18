@@ -91,18 +91,18 @@ export function describeConditionDirection(condition: NightCondition): {
     case "polar-day":
       return {
         title: "Polar day: the Sun stays above the horizon all night.",
-        suggestion: "Try a date in autumn or winter, or choose a location further south.",
+        suggestion: "Try a date nearer the winter solstice, or choose a location closer to the equator.",
       };
     case "white-night":
       return {
         title: "White night: the Sun sets briefly but stays in civil twilight above -6°.",
-        suggestion: "Try a date closer to winter or choose a place at a lower latitude.",
+        suggestion: "Try a date nearer the winter solstice, or choose a location closer to the equator.",
       };
     case "no-nautical-darkness":
       return {
         title: "Bright twilight persists: the Sun never drops below -12° tonight.",
         suggestion:
-          "Bright planets and stars are still visible, or try a date outside summer for deep-sky viewing.",
+          "Bright planets and stars are still visible, or try a date further from the summer solstice for deep-sky viewing.",
       };
     case "no-astronomical-darkness":
       return {

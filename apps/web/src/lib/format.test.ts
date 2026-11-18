@@ -1,6 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { planNight } from "@cyno/engine";
-import { formatDarkAndMoonSummary, formatTimeHHMM, reasonsBesideDarkAndMoon } from "./format";
+import type { NightCondition } from "@cyno/engine";
+import {
+  describeConditionDirection,
+  formatDarkAndMoonSummary,
+  formatTimeHHMM,
+  reasonsBesideDarkAndMoon,
+} from "./format";
+
+describe("describeConditionDirection", () => {
+  const conditions: NightCondition[] = [
+    "normal",
+    "no-astronomical-darkness",
+    "no-nautical-darkness",
+    "white-night",
+    "polar-day",
+    "polar-night",
+  ];
+
+  it("sends polar-day and white-night observers towards the equator and the winter solstice", () => {
+    for (const condition of ["polar-day", "white-night"] as const) {
+      const suggestion = describeConditionDirection(condition)!.suggestion;
+      expect(suggestion).toContain("closer to the equator");
+      expect(suggestion).toContain("nearer the winter solstice");
+    }
+  });
+
+  it.each(conditions)("gives advice for %s that holds in both hemispheres", (condition) => {
+    const text = Object.values(describeConditionDirection(condition) ?? {}).join(" ");
+    expect(text).not.toMatch(/\b(north|south)(ern|ward|wards)?\b/i);
+    expect(text).not.toMatch(/\b(autumn|fall|spring)\b/i);
+    expect(text).not.toMatch(/\b(summer|winter)\b(?! solstice)/i);
+  });
+});
 
 describe("formatTimeHHMM", () => {
   it("rounds to the nearest minute instead of truncating", () => {

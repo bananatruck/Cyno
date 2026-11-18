@@ -142,4 +142,65 @@ describe("RankedList", () => {
     expect(within(hiddenList).getByText(targetHidden.name)).toBeTruthy();
     expect(within(hiddenList).queryByText(otherHidden.name)).toBeNull();
   });
+
+  it("hides the kind label when it only repeats the object's name", () => {
+    const moon = samplePlan.objects.find((object) => object.kind === "moon")!;
+    const planet = samplePlan.objects.find((object) => object.kind === "planet")!;
+    render(<RankedList plan={samplePlan} selectedId={moon.id} onSelect={() => {}} />);
+    const cardButton = (name: string) =>
+      screen
+        .getAllByRole("button")
+        .find((button) => button.hasAttribute("aria-expanded") && button.textContent?.includes(name))!;
+    expect(cardButton(moon.name).textContent).not.toMatch(/Moon\s*Moon/);
+    expect(within(cardButton(moon.name)).getAllByText(/^moon$/i)).toHaveLength(1);
+    expect(within(cardButton(planet.name)).getByText("Planet")).toBeTruthy();
+  });
+
+  describe("empty state", () => {
+    const polarDay = planNight({ latitude: 69.65, longitude: 18.96, date: "2026-06-21" });
+    const antarcticDay = planNight({ latitude: -75, longitude: 0, date: "2026-12-21" });
+    const emptyList = () => screen.getByRole("region", { name: "Ranked observable objects" });
+
+    it.each([
+      ["Tromso in June", polarDay],
+      ["Antarctica in December", antarcticDay],
+    ])("says the sky never gets dark on a polar day (%s)", (_, plan) => {
+      expect(plan.condition).toBe("polar-day");
+      expect(plan.objects).toHaveLength(0);
+      render(<RankedList plan={plan} selectedId={null} onSelect={() => {}} />);
+      const text = emptyList().textContent ?? "";
+      expect(text).toContain("The sky never gets dark enough tonight");
+      expect(text).not.toMatch(/darker sky|binoculars|telescope/);
+      const link = within(emptyList()).getByRole("link", { name: /verdict explanation/ });
+      expect(link.getAttribute("href")).toBe("#tonights-verdict");
+    });
+
+    it("says the sky never gets dark on a white night even with a normal-looking hidden list", () => {
+      const whiteNight = { ...samplePlan, condition: "white-night" as const, objects: [] };
+      render(<RankedList plan={whiteNight} selectedId={null} onSelect={() => {}} />);
+      expect(emptyList().textContent).toContain("The sky never gets dark enough tonight");
+    });
+
+    it("says the sky never gets dark when every hidden reason says so", () => {
+      const neverDark = {
+        ...samplePlan,
+        objects: [],
+        hidden: samplePlan.hidden.map((item) => ({
+          ...item,
+          reason: "The sky never gets dark here tonight.",
+        })),
+      };
+      render(<RankedList plan={neverDark} selectedId={null} onSelect={() => {}} />);
+      expect(emptyList().textContent).toContain("The sky never gets dark enough tonight");
+    });
+
+    it("keeps the sky and equipment advice for nights that do get dark", () => {
+      const darkButEmpty = { ...samplePlan, objects: [] };
+      expect(darkButEmpty.condition).toBe("normal");
+      render(<RankedList plan={darkButEmpty} selectedId={null} onSelect={() => {}} />);
+      const text = emptyList().textContent ?? "";
+      expect(text).toContain("Try switching to a darker sky preset");
+      expect(text).not.toContain("never gets dark");
+    });
+  });
 });

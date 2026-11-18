@@ -10,6 +10,8 @@ import type { WeatherStatus } from "@/lib/weather";
 import { BlurText } from "./ui/blur-text";
 import { NumberTicker } from "./ui/number-ticker";
 
+export const VERDICT_ANCHOR_ID = "tonights-verdict";
+
 export interface VerdictBannerProps {
   plan: NightPlan;
   placeName: string;
@@ -37,7 +39,7 @@ export function VerdictBanner({ plan, placeName, weatherStatus = "ok" }: Verdict
   const allReasons = plan.verdict.reasons.join(" ");
 
   return (
-    <section aria-label="Tonight's verdict" className="mb-1">
+    <section id={VERDICT_ANCHOR_ID} aria-label="Tonight's verdict" className="mb-1">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="m-0 flex items-baseline gap-2 font-display text-[34px] leading-none font-normal tracking-tight text-starlight md:text-[44px]">
           <BlurText text={verdictWord} animateBy="letters" delay={35} />

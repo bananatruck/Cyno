@@ -143,7 +143,16 @@ test("explains polar day in Tromso on 2026-06-21", async ({ page }) => {
   const note = page.getByRole("region", { name: "Sky condition note" });
   await expect(note).toContainText("Polar day: the Sun stays above the horizon all night.");
   await expect(note).toContainText("The Sun never sets here tonight.");
-  await expect(note).toContainText("Try a date in autumn or winter, or choose a location further south.");
+  await expect(note).toContainText(
+    "Try a date nearer the winter solstice, or choose a location closer to the equator.",
+  );
+  const ranked = page.getByRole("region", { name: "Ranked observable objects" });
+  await expect(ranked).toContainText("The sky never gets dark enough tonight");
+  await expect(ranked).not.toContainText("darker sky preset");
+  await expect(ranked.getByRole("link", { name: "verdict explanation" })).toHaveAttribute(
+    "href",
+    "#tonights-verdict",
+  );
   const timeline = await box(page.getByRole("region", { name: "Night sky timeline" }));
   expect(timeline.y + timeline.height, "timeline fits in a 1440x900 viewport").toBeLessThanOrEqual(900);
   await page.waitForTimeout(650);
@@ -153,10 +162,24 @@ test("explains polar day in Tromso on 2026-06-21", async ({ page }) => {
 test("shows the latitude error for latitude 95", async ({ page }) => {
   await page.route(OPEN_METEO, (route) => route.abort());
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?lat=95&lon=0&date=2026-11-17");
+  await page.goto("/?lat=45&lon=0&date=2026-11-17");
+  const header = page.locator("header");
+  const latitude = page.getByLabel("Latitude");
+  await expect(page.getByRole("region", { name: "Tonight's verdict" })).toBeVisible();
+  const validHeader = await box(header);
 
-  await expect(page.getByLabel("Latitude")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByRole("alert")).toHaveText("Latitude must be between -90° and 90°.");
+  await latitude.fill("95");
+  await expect(latitude).toHaveAttribute("aria-invalid", "true");
+  const alert = page.getByRole("alert");
+  await expect(alert).toHaveText("Latitude must be between -90° and 90°.");
+  await expect(latitude).toHaveAttribute("aria-describedby", (await alert.getAttribute("id"))!);
+  expect((await box(header)).height, "the error does not change the header's height").toBeCloseTo(
+    validHeader.height,
+    0,
+  );
+  const latBox = await box(latitude);
+  const alertBox = await box(alert);
+  expect(alertBox.y, "the error sits below the field").toBeGreaterThanOrEqual(latBox.y + latBox.height);
   await expect(page.getByRole("heading", { name: "Check the coordinates or date above" })).toBeVisible();
   await page.waitForTimeout(300);
   await page.screenshot({ path: screenshotPath("input-error.png"), fullPage: false });

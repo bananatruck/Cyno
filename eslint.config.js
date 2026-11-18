@@ -25,4 +25,27 @@ export default tseslint.config(
     plugins: { "react-hooks": reactHooks },
     rules: { ...reactHooks.configs.recommended.rules },
   },
+  {
+    // The full engine (astronomy-engine and the catalog) belongs in the worker or a lazy chunk.
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/web/src/lib/plan.worker.ts",
+      "apps/web/src/**/*.test.{ts,tsx}",
+      "apps/web/src/**/test-*.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@cyno/engine",
+              message: 'Import runtime values from "@cyno/engine/input", or use import("@cyno/engine").',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

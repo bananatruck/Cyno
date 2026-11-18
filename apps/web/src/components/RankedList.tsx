@@ -5,6 +5,7 @@ import { formatObjectKind, formatSignedPoints, formatTimeHHMM } from "@/lib/form
 import { BorderBeam } from "./ui/border-beam";
 import { NumberTicker } from "./ui/number-ticker";
 import { SpotlightCard } from "./ui/spotlight-card";
+import { VERDICT_ANCHOR_ID } from "./VerdictBanner";
 import { cn } from "@/lib/utils";
 
 export type ObjectFilterCategory = "all" | "solar-system" | "stars" | "deep-sky";
@@ -16,6 +17,22 @@ export function categorizeKind(kind: ObjectKind): Exclude<ObjectFilterCategory, 
 }
 
 const INITIAL_SHOWN = 10;
+const NEVER_DARK_REASON = "The sky never gets dark here tonight.";
+
+function skyNeverGetsDark(plan: NightPlan): boolean {
+  if (plan.condition === "polar-day" || plan.condition === "white-night") return true;
+  return (
+    plan.objects.length === 0 &&
+    plan.hidden.length > 0 &&
+    plan.hidden.every((item) => item.reason === NEVER_DARK_REASON)
+  );
+}
+
+/** Null when the kind would only repeat the name, as for the Moon. */
+function kindLabel(name: string, kind: ObjectKind): string | null {
+  const label = formatObjectKind(kind);
+  return label.toLowerCase() === name.trim().toLowerCase() ? null : label;
+}
 
 export interface RankedListProps {
   plan: NightPlan;
@@ -170,7 +187,18 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
       <div className="flex flex-col gap-2 lg:-mr-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2 [&_:focus-visible]:-outline-offset-2">
         {filteredObjects.length === 0 ? (
           <div className="rounded-xl border border-moonsilver/20 bg-nautical/35 p-3.5 text-[14px] text-moonsilver">
-            {plan.objects.length === 0 ? (
+            {plan.objects.length === 0 && skyNeverGetsDark(plan) ? (
+              <p className="m-0">
+                The sky never gets dark enough tonight for catalog objects to stand out. See the{" "}
+                <a
+                  href={`#${VERDICT_ANCHOR_ID}`}
+                  className="text-signal underline underline-offset-2 hover:text-starlight"
+                >
+                  verdict explanation
+                </a>{" "}
+                for why, and which dates or places would work.
+              </p>
+            ) : plan.objects.length === 0 ? (
               <p className="m-0">
                 No catalog objects pass the visibility threshold tonight. Try switching to a darker sky
                 preset, choosing binoculars or a telescope, or picking another date.
@@ -186,6 +214,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
           <div className="flex flex-col gap-1.5">
             {shownObjects.map((object) => {
               const isSelected = object.id === selectedId;
+              const kind = kindLabel(object.name, object.kind);
               const visibleWindow = `Visible ${formatTimeHHMM(object.visibleFrom, plan.input.timeZone)} to ${formatTimeHHMM(object.visibleTo, plan.input.timeZone)}`;
               const moonSepText =
                 object.moonSeparationDeg === null
@@ -216,7 +245,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                         <span className="font-display text-[20px] leading-none text-starlight">
                           {object.name}
                         </span>
-                        <span className="text-[12px] text-moonsilver">{formatObjectKind(object.kind)}</span>
+                        {kind && <span className="text-[12px] text-moonsilver">{kind}</span>}
                       </div>
                       <p className="m-0 mt-0.5 pl-7 text-[12px] leading-snug text-moonsilver">
                         {object.summary}
@@ -322,7 +351,9 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                   >
                     <div className="flex items-baseline gap-2">
                       <span className="font-display text-[15px] text-starlight">{item.name}</span>
-                      <span className="text-[11px] text-moonsilver">{formatObjectKind(item.kind)}</span>
+                      {kindLabel(item.name, item.kind) && (
+                        <span className="text-[11px] text-moonsilver">{kindLabel(item.name, item.kind)}</span>
+                      )}
                     </div>
                     <span className="text-moonsilver">{item.reason}</span>
                   </li>

@@ -44,6 +44,29 @@ describe("ControlsBar", () => {
     expect(alert.textContent).toBe("Latitude must be between -90° and 90°.");
   });
 
+  it("links each field error to its input with aria-describedby", () => {
+    render(<ControlsHarness />);
+    const latInput = screen.getByLabelText("Latitude");
+    const lonInput = screen.getByLabelText("Longitude");
+    expect(latInput.hasAttribute("aria-describedby")).toBe(false);
+
+    fireEvent.change(latInput, { target: { value: "95" } });
+    fireEvent.change(lonInput, { target: { value: "200" } });
+
+    for (const [input, message] of [
+      [latInput, "Latitude must be between -90° and 90°."],
+      [lonInput, "Longitude must be between -180° and 180°."],
+    ] as const) {
+      const describedBy = input.getAttribute("aria-describedby");
+      expect(describedBy).toBeTruthy();
+      expect(document.getElementById(describedBy!)?.textContent).toBe(message);
+    }
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
+
+    fireEvent.change(latInput, { target: { value: "45" } });
+    expect(latInput.hasAttribute("aria-describedby")).toBe(false);
+  });
+
   it("summarises the place on one line and the full date, sky and equipment on a second line", () => {
     render(<ControlsHarness />);
     const summary = screen

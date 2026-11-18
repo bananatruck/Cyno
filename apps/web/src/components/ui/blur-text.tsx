@@ -1,6 +1,6 @@
 // Source: https://reactbits.dev/r/BlurText-TS-TW.json (https://reactbits.dev/text-animations/blur-text)
 // License: MIT + Commons Clause (https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md); use inside an application is allowed, selling the components is not.
-import { motion, MotionConfig, type Easing, type Transition } from "motion/react";
+import { m, MotionConfig, type Easing, type Transition } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -114,7 +114,7 @@ export function BlurText({
           };
 
           return (
-            <motion.span
+            <m.span
               key={`${segment}-${index}`}
               initial={fromSnapshot}
               animate={inView ? animateKeyframes : fromSnapshot}
@@ -124,7 +124,7 @@ export function BlurText({
             >
               {segment === " " ? "\u00A0" : segment}
               {animateBy === "words" && index < elements.length - 1 && "\u00A0"}
-            </motion.span>
+            </m.span>
           );
         })}
       </Tag>

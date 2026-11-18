@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Eye, LocateFixed, SlidersHorizontal } from "lucide-react";
-import { parsePlanInput, type Equipment, type InputError, type SkyQuality } from "@cyno/engine";
+import type { Equipment, InputError, SkyQuality } from "@cyno/engine";
+import { parsePlanInput } from "@cyno/engine/input";
 import type { PlacePreset } from "@/lib/places";
 import { PlaceCombobox } from "./ui/place-combobox";
 import { SegmentedControl, type SegmentOption } from "./ui/segmented-control";
@@ -18,6 +19,12 @@ const EQUIPMENT_OPTIONS: readonly SegmentOption<Equipment>[] = [
   { value: "binoculars", label: "Binoculars" },
   { value: "telescope", label: "Telescope" },
 ];
+
+/** Out of flow on desktop so an error never changes the header's height or wrapping. */
+const FIELD_ERRORS_CLASS =
+  "flex w-full flex-col items-center text-[12px] text-horizon lg:pointer-events-none lg:absolute lg:top-full lg:left-0 lg:z-10 lg:mt-0.5 lg:w-max lg:items-start lg:rounded-md lg:bg-abyss/95 lg:px-1.5 lg:py-0.5";
+
+type FieldWithError = "latitude" | "longitude" | "date";
 
 function optionLabel<T extends string>(options: readonly SegmentOption<T>[], value: T): string {
   return options.find((option) => option.value === value)?.label ?? value;
@@ -63,6 +70,8 @@ export function ControlsBar({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const errorIdPrefix = useId();
+  const errorId = (field: FieldWithError) => `${errorIdPrefix}${field}-error`;
 
   const validationErrors = useMemo<InputError[]>(() => {
     const parsedLat = latText.trim() === "" ? Number.NaN : Number(latText);
@@ -81,6 +90,13 @@ export function ControlsBar({
   const latError = validationErrors.find((e) => e.field === "latitude")?.message;
   const lonError = validationErrors.find((e) => e.field === "longitude")?.message;
   const dateError = validationErrors.find((e) => e.field === "date")?.message;
+  const fieldErrors = (
+    [
+      ["latitude", latError],
+      ["longitude", lonError],
+      ["date", dateError],
+    ] as const
+  ).flatMap(([field, message]) => (message ? [{ field, message }] : []));
 
   const handleLocate = () => {
     setGeoStatus(null);
@@ -170,7 +186,7 @@ export function ControlsBar({
               <span>{locating ? "Locating..." : "Use my location"}</span>
             </button>
 
-            <div className="flex flex-col">
+            <div className="relative flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2">
               <label className="flex items-center gap-1 text-[13px] text-moonsilver">
                 <span>Lat</span>
                 <input
@@ -178,6 +194,7 @@ export function ControlsBar({
                   step="any"
                   aria-label="Latitude"
                   aria-invalid={Boolean(latError)}
+                  aria-describedby={latError ? errorId("latitude") : undefined}
                   value={latText}
                   onChange={(e) => onLatChange(e.target.value)}
                   className={cn(
@@ -186,14 +203,6 @@ export function ControlsBar({
                   )}
                 />
               </label>
-              {latError && (
-                <span role="alert" className="mt-0.5 text-[12px] text-horizon">
-                  {latError}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-col">
               <label className="flex items-center gap-1 text-[13px] text-moonsilver">
                 <span>Lon</span>
                 <input
@@ -201,6 +210,7 @@ export function ControlsBar({
                   step="any"
                   aria-label="Longitude"
                   aria-invalid={Boolean(lonError)}
+                  aria-describedby={lonError ? errorId("longitude") : undefined}
                   value={lonText}
                   onChange={(e) => onLonChange(e.target.value)}
                   className={cn(
@@ -209,20 +219,13 @@ export function ControlsBar({
                   )}
                 />
               </label>
-              {lonError && (
-                <span role="alert" className="mt-0.5 text-[12px] text-horizon">
-                  {lonError}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-col">
               <label className="flex items-center gap-1 text-[13px] text-moonsilver">
                 <span className="sr-only">Date</span>
                 <input
                   type="date"
                   aria-label="Date"
                   aria-invalid={Boolean(dateError)}
+                  aria-describedby={dateError ? errorId("date") : undefined}
                   value={date}
                   onChange={(e) => onDateChange(e.target.value)}
                   className={cn(
@@ -231,10 +234,14 @@ export function ControlsBar({
                   )}
                 />
               </label>
-              {dateError && (
-                <span role="alert" className="mt-0.5 text-[12px] text-horizon">
-                  {dateError}
-                </span>
+              {fieldErrors.length > 0 && (
+                <div className={FIELD_ERRORS_CLASS}>
+                  {fieldErrors.map(({ field, message }) => (
+                    <span key={field} id={errorId(field)} role="alert">
+                      {message}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 

@@ -53,7 +53,7 @@ The memorable thing is the timeline: it is drawn as the actual colour of the sky
 Everything around it stays quiet: glass panels at low opacity, thin hairlines, no gradient washes.
 Motion happens once on load (the stars fade in and the chart's objects rise to their positions) and otherwise only in answer to the user (scrubbing, selecting, expanding the reasoning).
 Every object's reasoning is one tap away and reads as plain sentences with the points beside them.
-Empty and error states give direction: "No dark sky here tonight: the Sun stays 4 degrees below the horizon at its lowest. Try a date in winter or a place further south."
+Empty and error states give direction: "No dark sky here tonight: the Sun stays 4 degrees below the horizon at its lowest. Try a date nearer the winter solstice or a place closer to the equator."
 Reduced motion turns off the starfield drift and shooting stars; keyboard focus is always visible; contrast meets WCAG AA in both modes.
 
 ## Self-review against generic defaults

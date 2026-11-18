@@ -1,4 +1,4 @@
-import { resolveTimeZone } from "@cyno/engine";
+import { resolveTimeZone } from "@cyno/engine/input";
 
 export interface PlacePreset {
   name: string;

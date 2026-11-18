@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  parsePlanInput,
-  planNight,
-  PlanInputError,
-  type InputError,
-  type NightPlan,
-  type PlanInput,
-} from "@cyno/engine";
+import type { InputError, NightPlan, PlanInput } from "@cyno/engine";
+import { parsePlanInput, PlanInputError } from "@cyno/engine/input";
 import { fetchCloudForecast, type WeatherStatus } from "./weather";
 import type { WorkerRequest, WorkerResponse } from "./plan.worker";
 
@@ -127,9 +121,10 @@ export function usePlan(rawInput: unknown): UsePlanResult {
         const message: WorkerRequest = { id: reqId, input: inputToRun };
         worker.postMessage(message);
       } else {
-        queueMicrotask(() => {
-          if (requestIdRef.current !== reqId) return;
+        void (async () => {
           try {
+            const { planNight } = await import("@cyno/engine");
+            if (requestIdRef.current !== reqId) return;
             const computed = planNight(inputToRun);
             if (requestIdRef.current !== reqId) return;
             setAsyncState((prev) => ({
@@ -167,7 +162,7 @@ export function usePlan(rawInput: unknown): UsePlanResult {
               });
             }
           }
-        });
+        })();
       }
     };
 

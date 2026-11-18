@@ -1,7 +1,7 @@
 // Source: https://21st.dev/@halaska-studio/components/segmented-control
 // License: MIT (as listed on the 21st.dev component page)
 import { useId } from "react";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 
 export interface SegmentOption<T extends string> {
@@ -49,7 +49,7 @@ export function SegmentedControl<T extends string>({
             )}
           >
             {active && (
-              <motion.span
+              <m.span
                 layoutId={`segment-pill-${groupId}`}
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 -z-10 rounded-full border border-signal/45 bg-civil/60"

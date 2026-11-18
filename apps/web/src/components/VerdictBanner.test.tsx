@@ -71,6 +71,22 @@ describe("VerdictBanner", () => {
     for (const reason of polarDayPlan.verdict.reasons) {
       expect(within(note).getByText(reason, { exact: false })).toBeTruthy();
     }
-    expect(note.textContent).toContain("Try a date in autumn or winter, or choose a location further south.");
+    expect(note.textContent).toContain(
+      "Try a date nearer the winter solstice, or choose a location closer to the equator.",
+    );
+  });
+
+  it("gives polar-day advice that holds in the southern hemisphere", () => {
+    const antarcticDay = planNight({ latitude: -75, longitude: 0, date: "2026-12-21" });
+    expect(antarcticDay.condition).toBe("polar-day");
+    render(<VerdictBanner plan={antarcticDay} placeName="Antarctica" weatherStatus="out-of-range" />);
+    const note = screen.getByRole("region", { name: "Sky condition note" });
+    expect(note.textContent).toContain("closer to the equator");
+    expect(note.textContent).not.toMatch(/south|north|autumn/i);
+  });
+
+  it("carries the anchor that the ranked list's empty state links to", () => {
+    render(<VerdictBanner plan={longBeach} placeName="Long Beach, CA" weatherStatus="offline" />);
+    expect(screen.getByRole("region", { name: "Tonight's verdict" }).id).toBe("tonights-verdict");
   });
 });
