@@ -13,6 +13,7 @@ Run: python3 -I scripts/build-catalog.py   (from packages/engine)
 The output file is generated; edit this script, not the JSON.
 """
 import csv
+import hashlib
 import io
 import json
 import re
@@ -20,12 +21,19 @@ import sys
 import urllib.request
 from pathlib import Path
 
+OPENNGC_COMMIT = "be3cd6c5498806a2fbb2f7e0452ef802dbb02be0"
 IAU_URL = "https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt"
-NGC_URL = "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv"
-ADD_URL = "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv"
+NGC_URL = f"https://raw.githubusercontent.com/mattiaverga/OpenNGC/{OPENNGC_COMMIT}/database_files/NGC.csv"
+ADD_URL = f"https://raw.githubusercontent.com/mattiaverga/OpenNGC/{OPENNGC_COMMIT}/database_files/addendum.csv"
 HARRIS_URL = "https://physics.mcmaster.ca/~harris/mwgc.dat"
 STAR_MAG_LIMIT = 2.5
 OUT = Path(__file__).resolve().parent.parent / "src" / "data" / "catalog.json"
+
+# SHA-256 of upstream files without versioned URLs (computed 2026-11-17).
+PINNED_SHA256 = {
+    "IAU-CSN": "84fac0c90f1b19abc491c2793469e0caa7b003ad1bc93a790ca41147010d0eb0",
+    "Harris 2010": "b457a690adc422fb2e8e05a23e1de50b62d1d5ac10dce99963c956c1b17ca658",
+}
 
 # OpenNGC type codes -> engine object kinds.
 TYPE_KIND = {
@@ -52,10 +60,30 @@ STAR_RE = re.compile(
 )
 
 
-def fetch(url: str) -> str:
+def fetch(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "cyno-catalog-build"})
     with urllib.request.urlopen(req, timeout=60) as r:
-        return r.read().decode("utf-8")
+        return r.read()
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def fetch_pinned(name: str, url: str) -> str:
+    data = fetch(url)
+    digest = sha256(data)
+    expected = PINNED_SHA256.get(name)
+    if expected and digest != expected:
+        print(
+            f"Refusing to build: {name} SHA-256 mismatch.\n"
+            f"  expected (in script): {expected}\n"
+            f"  downloaded:           {digest}\n"
+            f"Update PINNED_SHA256 deliberately if the upstream file changed.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return data.decode("utf-8")
 
 
 def hms_to_deg(s: str) -> float:
@@ -151,13 +179,15 @@ def messier(ngc_text: str, add_text: str, vt: dict[str, float]) -> tuple[list[di
 
 
 def main() -> int:
-    s = stars(fetch(IAU_URL))
-    m, skipped = messier(fetch(NGC_URL), fetch(ADD_URL), harris_vt(fetch(HARRIS_URL)))
+    s = stars(fetch_pinned("IAU-CSN", IAU_URL))
+    ngc = fetch(NGC_URL).decode("utf-8")
+    add = fetch(ADD_URL).decode("utf-8")
+    m, skipped = messier(ngc, add, harris_vt(fetch_pinned("Harris 2010", HARRIS_URL)))
     doc = {
         "_generated": "by scripts/build-catalog.py; do not edit by hand",
         "sources": {
             "IAU-CSN": IAU_URL,
-            "OpenNGC": "https://github.com/mattiaverga/OpenNGC (CC-BY-SA-4.0), " + NGC_URL,
+            "OpenNGC": f"https://github.com/mattiaverga/OpenNGC @ {OPENNGC_COMMIT} (CC-BY-SA-4.0), {NGC_URL}",
             "Harris 2010": HARRIS_URL,
         },
         "starMagLimit": STAR_MAG_LIMIT,
