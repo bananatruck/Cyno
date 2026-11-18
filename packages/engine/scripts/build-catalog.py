@@ -154,10 +154,10 @@ def ngc2000_vmag(designation: str, ra_deg: float, dec_deg: float) -> float | Non
     EXPECTED_NGC2000_VMAG, so a rerun cannot silently change the catalog.
     """
     text = fetch(HEASARC_URL.format(ra=f"{ra_deg:.4f}", dec=f"{dec_deg:.4f}")).decode("utf-8")
+    # An empty or plain-text error response has no table; it falls through to the expected-value check
+    # below and stops the build, so a configured object can never be dropped silently.
     lines = [line for line in text.splitlines() if "|" in line]
-    if not lines:
-        return None
-    header = [h.strip() for h in lines[0].split("|")]
+    header = [h.strip() for h in lines[0].split("|")] if lines else []
     want = re.sub(r"^NGC0*", "NGC ", designation)
     value = None
     for line in lines[1:]:
