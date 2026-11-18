@@ -1,6 +1,6 @@
 import type { DarkWindow, MoonInfo, NightCondition, ResolvedInput, Verdict } from "./types";
 import { clamp } from "./rank";
-import { cloudAt, HOUR } from "./time";
+import { cloudAtParsed, HOUR, parseCloudCover, type ParsedCloudCover } from "./time";
 
 /** One sentence for the scored dark window, wording depends on how dark the sky gets. */
 export function formatDarkWindowReason(
@@ -23,6 +23,7 @@ export function formatDarkWindowReason(
 export function meanCloud(
   input: ResolvedInput,
   dark: DarkWindow,
+  parsedCloud: ParsedCloudCover | null = parseCloudCover(input.cloudCover),
 ): { mean: number; coveredFraction: number } | null {
   const a = Date.parse(dark.start),
     b = Date.parse(dark.end);
@@ -31,9 +32,7 @@ export function meanCloud(
     ...new Set([
       a,
       b,
-      ...(input.cloudCover ?? [])
-        .flatMap((c) => [Date.parse(c.time), Date.parse(c.time) + HOUR])
-        .filter((t) => t > a && t < b),
+      ...(parsedCloud?.times ?? []).flatMap((t) => [t, t + HOUR]).filter((t) => t > a && t < b),
     ]),
   ].sort((x, y) => x - y);
   let weighted = 0;
@@ -42,7 +41,7 @@ export function meanCloud(
     const left = edges[i - 1],
       right = edges[i];
     if (left === undefined || right === undefined) continue;
-    const cloud = cloudAt((left + right) / 2, input.cloudCover);
+    const cloud = cloudAtParsed((left + right) / 2, parsedCloud);
     if (cloud === null) continue;
     const width = right - left;
     weighted += cloud * width;
@@ -75,6 +74,7 @@ export function verdict(
   moon: MoonInfo,
   clock: (time: string) => string,
   lowestSunAltDeg: number,
+  parsedCloud: ParsedCloudCover | null = parseCloudCover(input.cloudCover),
 ): Verdict {
   // SPEC: only a missing or civil-twilight-only dark window is an automatic no-go. A nautical-only
   // window is still scored (with no darkness points) and gets the explanation as its first reason.
@@ -85,7 +85,7 @@ export function verdict(
       score: 0,
       reasons: [limitedDarknessReason(condition, lowestSunAltDeg)],
     };
-  const clouds = meanCloud(input, dark);
+  const clouds = meanCloud(input, dark, parsedCloud);
   const base =
     (dark.level === "night" || dark.level === "astronomical-twilight" ? 40 * clamp(dark.hours / 4) : 0) +
     30 * (1 - moon.illumination * clamp(moon.hoursUpInDarkWindow / dark.hours));

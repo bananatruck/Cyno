@@ -3,7 +3,7 @@ import { Body, Illumination, MakeTime, Observer, Rotation_EQJ_HOR } from "astron
 import { catalog, planNight } from "../src/index";
 import { effectiveMagnitude, limitingMagnitude } from "../src/brightness";
 import { bodyPosition, catalogPosition, separation } from "../src/positions";
-import { cloudAt, clockFormatter, DAY, HOUR, localNoon, nightWindow } from "../src/time";
+import { addCalendarDays, cloudAt, clockFormatter, DAY, HOUR, localNoon, nightWindow } from "../src/time";
 import { darkness } from "../src/sky";
 import type { PlanInput } from "../src/types";
 import { required } from "./helpers";
@@ -272,6 +272,31 @@ it("uses local noon across daylight saving changes", () => {
     }
   }
   expect(changes).toBeGreaterThan(0);
+  const offsetHoursAt = (utcMs: number) => {
+    const part = new Intl.DateTimeFormat("en-US", {
+      timeZone: input.timeZone,
+      timeZoneName: "shortOffset",
+    })
+      .formatToParts(utcMs)
+      .find((x) => x.type === "timeZoneName")?.value;
+    const m = /^GMT([+-])(\d+)(?::(\d+))?$/.exec(part ?? "");
+    if (!m) return -8;
+    const sign = m[1] === "-" ? -1 : 1;
+    return sign * (Number(m[2]) + Number(m[3] ?? 0) / 60);
+  };
+  for (const [nightDate, hours, offsetStart, offsetEnd] of [
+    ["2026-03-07", 23, -8, -7],
+    ["2026-10-31", 25, -7, -8],
+  ] as const) {
+    const start = localNoon(nightDate, input.timeZone);
+    const end = localNoon(addCalendarDays(nightDate, 1), input.timeZone);
+    expect(offsetHoursAt(start)).toBe(offsetStart);
+    expect(offsetHoursAt(end)).toBe(offsetEnd);
+    expect(end - start).toBe(hours * HOUR);
+    const w = nightWindow(nightDate, input.timeZone);
+    expect(Date.parse(w.start)).toBe(start);
+    expect(Date.parse(w.end)).toBe(end);
+  }
 });
 it("is deterministic, does not mutate input and uses plain local text", () => {
   const raw: PlanInput = { ...input, cloudCover: forecast(35).reverse() };

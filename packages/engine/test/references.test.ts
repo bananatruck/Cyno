@@ -89,6 +89,8 @@ describe("JPL Horizons airless topocentric positions", () => {
     for (const row of horizons(file))
       it(`${body} at ${row.time}`, () => {
         const actual = bodyPosition(body, MakeTime(new Date(row.time)), observer);
+        expect(actual.azDeg).toBeGreaterThanOrEqual(0);
+        expect(actual.azDeg).toBeLessThan(360);
         const delta = Math.abs(actual.azDeg - row.azDeg);
         expect(Math.min(delta, 360 - delta)).toBeLessThanOrEqual(0.1);
         expect(Math.abs(actual.altDeg - row.altDeg)).toBeLessThanOrEqual(0.1);

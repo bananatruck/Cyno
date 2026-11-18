@@ -1,8 +1,8 @@
 import { Body, Illumination, MakeTime, Observer, Rotation_EQJ_HOR } from "astronomy-engine";
 import type { HiddenObject, NightPlan, PlanInput, RankedObject } from "./types";
-import { resolveInput } from "./input";
+import { PlanInputError, resolveInput } from "./input";
 import { bodies, catalog, bodyPosition } from "./positions";
-import { clockFormatter, cloudAt, HOUR, nightWindow } from "./time";
+import { clockFormatter, cloudAtParsed, HOUR, localNoonExists, nightWindow, parseCloudCover } from "./time";
 import { darkness, moonInfo, nightDarkness, skyEvents } from "./sky";
 import { limitingMagnitude } from "./brightness";
 import { evaluateTarget } from "./evaluate";
@@ -13,6 +13,10 @@ export { catalog } from "./positions";
 
 export function planNight(input: PlanInput): NightPlan {
   const resolved = resolveInput(input);
+  if (!localNoonExists(resolved.date, resolved.timeZone)) {
+    throw new PlanInputError([{ field: "date", message: "That date does not exist in this time zone." }]);
+  }
+  const parsedCloud = parseCloudCover(resolved.cloudCover);
   const observer = new Observer(resolved.latitude, resolved.longitude, resolved.elevationMeters);
   const window = nightWindow(resolved.date, resolved.timeZone);
   const start = Date.parse(window.start),
@@ -35,13 +39,16 @@ export function planNight(input: PlanInput): NightPlan {
       moon: moonPosition,
       illumination,
       rotation: Rotation_EQJ_HOR(time, observer),
-      cloud: cloudAt(t, resolved.cloudCover),
+      cloud: cloudAtParsed(t, parsedCloud),
       duration: Math.min(step, end - t) / HOUR,
     });
     if (t === end) break;
   }
   const lowestSunAltDeg = Math.min(...samples.map((s) => s.sun.altDeg));
-  const skyGetsDark = samples.some((s) => s.sun.altDeg < -0.833);
+  const skyNeverGetsDark = condition === "polar-day";
+  const hasDarkSample = samples.some((s) => s.sun.altDeg < -0.833);
+  const hasDarkWindow = darkWindow !== null;
+  const visibility = { skyNeverGetsDark, hasDarkSample, hasDarkWindow };
   const timeline = samples.map((s) => ({
     time: s.iso,
     sunAltDeg: s.sun.altDeg,
@@ -80,7 +87,7 @@ export function planNight(input: PlanInput): NightPlan {
   const objects: RankedObject[] = [],
     hidden: HiddenObject[] = [];
   for (const target of targets) {
-    const result = evaluateTarget(target, samples, observer, resolved, clock, skyGetsDark);
+    const result = evaluateTarget(target, samples, observer, resolved, clock, visibility);
     if ("reason" in result) hidden.push(result);
     else objects.push(result);
   }
@@ -98,7 +105,7 @@ export function planNight(input: PlanInput): NightPlan {
     events,
     moon,
     timeline,
-    verdict: verdict(resolved, condition, darkWindow, moon, clock, lowestSunAltDeg),
+    verdict: verdict(resolved, condition, darkWindow, moon, clock, lowestSunAltDeg, parsedCloud),
     objects,
     hidden,
   };

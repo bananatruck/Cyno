@@ -4,6 +4,9 @@ import type { DarkWindow, Darkness, MoonInfo, NightCondition, SkyEvent, SkyEvent
 import { bodyPosition } from "./positions";
 import { moonPhaseName } from "./moonPhase";
 import { DAY, HOUR } from "./time";
+
+/** Geometric altitude threshold matching astronomy-engine SearchRiseSet for the Moon (centre ~0.8° below horizon). */
+export const MOON_RISE_SET_ALT_DEG = -0.8;
 export function darkness(alt: number): Darkness {
   return alt >= -0.833
     ? "day"
@@ -139,6 +142,10 @@ function moonRiseSetInWindow(observer: Observer, start: number, end: number) {
 function moonUpAt(observer: Observer, time: number): boolean {
   const rise = SearchRiseSet(Body.Moon, observer, 1, new Date(time), -2);
   const set = SearchRiseSet(Body.Moon, observer, -1, new Date(time), -2);
+  if (!rise && !set) {
+    const alt = bodyPosition(Body.Moon, MakeTime(new Date(time)), observer).altDeg;
+    return alt > MOON_RISE_SET_ALT_DEG;
+  }
   const riseT = rise?.date.getTime() ?? 0;
   const setT = set?.date.getTime() ?? 0;
   return riseT > setT;

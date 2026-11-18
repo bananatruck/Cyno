@@ -33,8 +33,9 @@ export function evaluateTarget(
   observer: Observer,
   resolved: ResolvedInput,
   clock: (time: string) => string,
-  skyGetsDark: boolean,
+  visibility: { skyNeverGetsDark: boolean; hasDarkSample: boolean; hasDarkWindow: boolean },
 ): RankedObject | HiddenObject {
+  const { skyNeverGetsDark, hasDarkSample, hasDarkWindow } = visibility;
   const track: TrackPoint[] = [];
   let best: {
     moment: BestMoment;
@@ -59,7 +60,7 @@ export function evaluateTarget(
         : catalogPosition(target.source.row, s.time, s.rotation);
     track.push({ time: s.iso, ...pos });
     // Culmination can fall in daylight; peak altitude is dark-sky only when darkness exists tonight.
-    const countsForPeak = !skyGetsDark || s.sun.altDeg < -0.833;
+    const countsForPeak = skyNeverGetsDark || s.sun.altDeg < -0.833;
     if (countsForPeak) peakAltDeg = Math.max(peakAltDeg, pos.altDeg);
     if (s.sun.altDeg >= -0.833 || pos.altDeg < 10) continue;
     highInDark = true;
@@ -112,13 +113,15 @@ export function evaluateTarget(
       };
   }
   if (!best) {
-    const reason = !skyGetsDark
+    const reason = skyNeverGetsDark
       ? "The sky never gets dark here tonight."
-      : !highInDark
-        ? "Never gets higher than 10° while the sky is dark."
-        : !brightInDark
-          ? "Too faint for this sky and equipment."
-          : "Clouds block every otherwise visible moment.";
+      : hasDarkWindow && !hasDarkSample
+        ? "Not dark long enough at this sampling step to check."
+        : !highInDark
+          ? "Never gets higher than 10° while the sky is dark."
+          : !brightInDark
+            ? "Too faint for this sky and equipment."
+            : "Clouds block every otherwise visible moment.";
     return {
       id: target.id,
       name: target.name,
