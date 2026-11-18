@@ -110,17 +110,14 @@ function dotRadius(kind: ObjectKind, magnitude: number) {
   return kind === "moon" ? 7 : Math.max(2.5, Math.min(6, 4.5 - magnitude * 0.5));
 }
 
-function clearPlacement(
-  box: LabelBox,
-  occupied: readonly LabelBox[],
-  dots: readonly DotObstacle[],
-  objectId: string,
-) {
+function clearPlacement(box: LabelBox, occupied: readonly LabelBox[], dots: readonly DotObstacle[]) {
   if (!insideChart(box)) return false;
   if (!occupied.every((placed) => !overlaps(box, placed))) return false;
-  return dots.every(
-    (dot) => dot.id === objectId || !boxOverlapsCircle(box, dot.x, dot.y, dot.r + DOT_PADDING),
-  );
+  return dots.every((dot) => !boxOverlapsCircle(box, dot.x, dot.y, dot.r + DOT_PADDING));
+}
+
+function clearsDots(box: LabelBox, dots: readonly DotObstacle[]) {
+  return insideChart(box) && dots.every((dot) => !boxOverlapsCircle(box, dot.x, dot.y, dot.r + DOT_PADDING));
 }
 
 function labelCandidates(x: number, y: number, distances: readonly number[]) {
@@ -149,14 +146,23 @@ function placeLabel(
   y: number,
   occupied: readonly LabelBox[],
   dots: readonly DotObstacle[],
-  objectId: string,
   required: boolean,
 ) {
-  const distances = required ? [LABEL_GAP, LABEL_GAP * 2, LABEL_GAP * 3] : [LABEL_GAP, LABEL_GAP * 2];
+  const distances = required
+    ? [LABEL_GAP, LABEL_GAP * 2, LABEL_GAP * 3, LABEL_GAP * 4, LABEL_GAP * 5, LABEL_GAP * 6]
+    : [LABEL_GAP, LABEL_GAP * 2];
   for (const candidate of labelCandidates(x, y, distances)) {
     const box = labelBox(name, candidate.x, candidate.y, candidate.textAnchor);
-    if (clearPlacement(box, occupied, dots, objectId)) {
+    if (clearPlacement(box, occupied, dots)) {
       return { ...candidate, box };
+    }
+  }
+  if (required) {
+    for (const candidate of labelCandidates(x, y, distances)) {
+      const box = labelBox(name, candidate.x, candidate.y, candidate.textAnchor);
+      if (clearsDots(box, dots)) {
+        return { ...candidate, box };
+      }
     }
   }
   return undefined;
@@ -189,7 +195,6 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
       position.y,
       occupied,
       dotObstacles,
-      object.id,
       object.id === selectedId,
     );
     if (placement) {
