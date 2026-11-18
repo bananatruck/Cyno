@@ -18,7 +18,7 @@ Kesh's own direction in `GeminiPlan.md` is "Comfort in the Cosmos", "Nebula & Gl
 | moonsilver | #AEB8D6 | Secondary text, the Moon and its arc                                                 |
 | signal     | #8EA7FF | Selection and focus, a cool periwinkle                                               |
 
-Red-Light Mode replaces every token with reds on #120000: text #FF5A4E, secondary #B3362E, panels #2A0505, nothing blue or white anywhere.
+Red-Light Mode replaces every token with reds on #120000: text #FF5A4E, secondary #ED6158 (at least 4.5:1 on both red backgrounds), panels #2A0505, nothing blue or white anywhere.
 
 ## Type
 

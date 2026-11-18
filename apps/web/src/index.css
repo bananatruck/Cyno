@@ -38,17 +38,17 @@ html[data-mode="red"] {
   --abyss: #120000;
   --nautical: #2a0505;
   --civil: #4a0e0e;
-  --horizon: #e24638;
+  --horizon: #ff6c5f;
   --starlight: #ff5a4e;
-  --moonsilver: #b3362e;
+  --moonsilver: #ed6158;
   --signal: #ff5a4e;
 
   --color-abyss: #120000;
   --color-nautical: #2a0505;
   --color-civil: #4a0e0e;
-  --color-horizon: #e24638;
+  --color-horizon: #ff6c5f;
   --color-starlight: #ff5a4e;
-  --color-moonsilver: #b3362e;
+  --color-moonsilver: #ed6158;
   --color-signal: #ff5a4e;
 
   --sky-day: #6e1510;
@@ -96,7 +96,32 @@ body {
   }
 }
 
+@keyframes blur-text-reveal {
+  from {
+    filter: blur(8px);
+    opacity: 0;
+    transform: translateY(var(--blur-text-offset));
+  }
+
+  to {
+    filter: blur(0);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.blur-text-segment {
+  animation-name: blur-text-reveal;
+  animation-duration: var(--blur-text-duration);
+  animation-timing-function: ease-out;
+  animation-fill-mode: backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .blur-text-segment {
+    animation: none !important;
+  }
+
   *,
   *::before,
   *::after {

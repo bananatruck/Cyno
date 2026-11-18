@@ -1,5 +1,4 @@
-// Source: https://reactbits.dev/r/SpotlightCard-TS-TW.json (https://reactbits.dev/components/spotlight-card)
-// License: MIT + Commons Clause (https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md); use inside an application is allowed, selling the components is not.
+// Adapted from React Bits (https://reactbits.dev), MIT + Commons Clause. Copyright (c) 2026 David Haz. Full notice in THIRD_PARTY_NOTICES.md at the repository root.
 import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
