@@ -24,7 +24,7 @@ IAU_URL = "https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt"
 NGC_URL = "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv"
 ADD_URL = "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/addendum.csv"
 HARRIS_URL = "https://physics.mcmaster.ca/~harris/mwgc.dat"
-STAR_MAG_LIMIT = 2.0
+STAR_MAG_LIMIT = 2.5
 OUT = Path(__file__).resolve().parent.parent / "src" / "data" / "catalog.json"
 
 # OpenNGC type codes -> engine object kinds.
