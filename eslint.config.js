@@ -44,6 +44,13 @@ export default tseslint.config(
               allowTypeImports: true,
             },
           ],
+          patterns: [
+            {
+              group: ["**/packages/engine/**", "**/engine/src/**"],
+              message: 'Import the engine as "@cyno/engine/input", or use import("@cyno/engine").',
+              allowTypeImports: true,
+            },
+          ],
         },
       ],
     },
