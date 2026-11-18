@@ -1,0 +1,133 @@
+@import "tailwindcss";
+@import "@fontsource/cormorant-garamond/400.css";
+@import "@fontsource/cormorant-garamond/500.css";
+@import "@fontsource/cormorant-garamond/600.css";
+@import "@fontsource/cormorant-garamond/700.css";
+@import "@fontsource-variable/manrope";
+
+:root {
+  --abyss: #050816;
+  --nautical: #13204a;
+  --civil: #34508f;
+  --horizon: #f2b880;
+  --starlight: #f4efe2;
+  --moonsilver: #aeb8d6;
+  --signal: #8ea7ff;
+
+  --color-abyss: #050816;
+  --color-nautical: #13204a;
+  --color-civil: #34508f;
+  --color-horizon: #f2b880;
+  --color-starlight: #f4efe2;
+  --color-moonsilver: #aeb8d6;
+  --color-signal: #8ea7ff;
+
+  --sky-day: #f2b880;
+  --sky-civil: #34508f;
+  --sky-nautical: #13204a;
+  --sky-astro: #0a112c;
+  --sky-night: #050816;
+
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Manrope Variable", "Manrope", system-ui, -apple-system, sans-serif;
+
+  color-scheme: dark;
+}
+
+html[data-mode="red"] {
+  --abyss: #120000;
+  --nautical: #2a0505;
+  --civil: #4a0e0e;
+  --horizon: #ff6c5f;
+  --starlight: #ff5a4e;
+  --moonsilver: #ed6158;
+  --signal: #ff5a4e;
+
+  --color-abyss: #120000;
+  --color-nautical: #2a0505;
+  --color-civil: #4a0e0e;
+  --color-horizon: #ff6c5f;
+  --color-starlight: #ff5a4e;
+  --color-moonsilver: #ed6158;
+  --color-signal: #ff5a4e;
+
+  --sky-day: #6e1510;
+  --sky-civil: #4a0e0e;
+  --sky-nautical: #2a0505;
+  --sky-astro: #1c0202;
+  --sky-night: #120000;
+}
+
+@theme inline {
+  --color-abyss: var(--abyss);
+  --color-nautical: var(--nautical);
+  --color-civil: var(--civil);
+  --color-horizon: var(--horizon);
+  --color-starlight: var(--starlight);
+  --color-moonsilver: var(--moonsilver);
+  --color-signal: var(--signal);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background-color: var(--color-abyss);
+  color: var(--color-starlight);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes blur-text-reveal {
+  from {
+    filter: blur(8px);
+    opacity: 0;
+    transform: translateY(var(--blur-text-offset));
+  }
+
+  to {
+    filter: blur(0);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.blur-text-segment {
+  animation-name: blur-text-reveal;
+  animation-duration: var(--blur-text-duration);
+  animation-timing-function: ease-out;
+  animation-fill-mode: backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blur-text-segment {
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
