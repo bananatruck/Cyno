@@ -18,6 +18,7 @@ export function categorizeKind(kind: ObjectKind): Exclude<ObjectFilterCategory, 
 
 const INITIAL_SHOWN = 10;
 const NEVER_DARK_REASON = "The sky never gets dark here tonight.";
+const CLOUDS_REASON = "Clouds block every otherwise visible moment.";
 
 function skyNeverGetsDark(plan: NightPlan): boolean {
   if (plan.condition === "polar-day" || plan.condition === "white-night") return true;
@@ -26,6 +27,25 @@ function skyNeverGetsDark(plan: NightPlan): boolean {
     plan.hidden.length > 0 &&
     plan.hidden.every((item) => item.reason === NEVER_DARK_REASON)
   );
+}
+
+/** With nothing visible, any cloud-blocked object means the clouds, not the sky or equipment, emptied the list. */
+function cloudsHideEverything(plan: NightPlan): boolean {
+  return plan.objects.length === 0 && plan.hidden.some((item) => item.reason === CLOUDS_REASON);
+}
+
+/**
+ * visibleFrom and visibleTo are the first and last visible samples, so a gap inside them only shows up as
+ * fewer accumulated hours than the span. A gap of a single sample is indistinguishable from sampling.
+ */
+function describeVisibleWindow(object: RankedObject, plan: NightPlan): string {
+  const zone = plan.input.timeZone;
+  const from = formatTimeHHMM(object.visibleFrom, zone);
+  const to = formatTimeHHMM(object.visibleTo, zone);
+  const spanHours = (Date.parse(object.visibleTo) - Date.parse(object.visibleFrom)) / 3_600_000;
+  const stepHours = plan.input.stepMinutes / 60;
+  if (spanHours - object.hoursVisible <= stepHours / 2) return `Visible ${from} to ${to}`;
+  return `Visible for ${object.hoursVisible.toFixed(1)} hours between ${from} and ${to}`;
 }
 
 /** Null when the kind would only repeat the name, as for the Moon. */
@@ -185,7 +205,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
               )}
             >
               <span>{chip.label}</span>
-              <span className="tabular-nums opacity-80">({chip.count})</span>
+              <span className="tabular-nums">({chip.count})</span>
             </button>
           );
         })}
@@ -205,6 +225,11 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                 </a>{" "}
                 for why, and which dates or places would work.
               </p>
+            ) : cloudsHideEverything(plan) ? (
+              <p className="m-0">
+                The forecast clouds hide everything tonight: every object that would otherwise be visible is
+                behind cloud. Check the forecast again closer to the night, or pick another date.
+              </p>
             ) : plan.objects.length === 0 ? (
               <p className="m-0">
                 No catalog objects pass the visibility threshold tonight. Try switching to a darker sky
@@ -222,7 +247,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
             {shownObjects.map((object) => {
               const isSelected = object.id === selectedId;
               const kind = kindLabel(object.name, object.kind);
-              const visibleWindow = `Visible ${formatTimeHHMM(object.visibleFrom, plan.input.timeZone)} to ${formatTimeHHMM(object.visibleTo, plan.input.timeZone)}`;
+              const visibleWindow = describeVisibleWindow(object, plan);
               const moonSepText =
                 object.moonSeparationDeg === null
                   ? "The Moon itself"
@@ -295,9 +320,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                             <div className="text-[11px] leading-tight tabular-nums text-moonsilver">
                               {factor.value}
                             </div>
-                            <div className="text-[11px] leading-tight text-moonsilver/80">
-                              {factor.detail}
-                            </div>
+                            <div className="text-[11px] leading-tight text-moonsilver">{factor.detail}</div>
                           </div>
                         ))}
                       </dl>
@@ -338,7 +361,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                 placeholder="Search not visible objects..."
                 value={hiddenSearch}
                 onChange={(e) => setHiddenSearch(e.target.value)}
-                className="w-full rounded-full border border-moonsilver/25 bg-abyss/65 py-1 pr-3 pl-8 text-[13px] text-starlight placeholder:text-moonsilver/70"
+                className="w-full rounded-full border border-moonsilver/25 bg-abyss/65 py-1 pr-3 pl-8 text-[13px] text-starlight placeholder:text-moonsilver"
               />
             </div>
 

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { planNight } from "@cyno/engine";
+import { planNight, type CloudSample } from "@cyno/engine";
 import { formatSignedPoints, formatTimeHHMM } from "@/lib/format";
 import { RankedList } from "./RankedList";
 
@@ -15,6 +15,21 @@ const samplePlan = planNight({
   sky: "suburban",
   equipment: "eye",
 });
+
+const CLOUD_REASON = "Clouds block every otherwise visible moment.";
+
+/** Hourly cloud cover from 2026-11-17T18:00Z for 30 hours, covering the Long Beach night window. */
+function hourlyClouds(percentAt: (time: Date) => number): CloudSample[] {
+  const start = Date.parse("2026-11-17T18:00:00Z");
+  return Array.from({ length: 30 }, (_, hour) => {
+    const time = new Date(start + hour * 3_600_000);
+    return { time: time.toISOString(), percent: percentAt(time) };
+  });
+}
+
+function hoursBetween(from: string, to: string) {
+  return (Date.parse(to) - Date.parse(from)) / 3_600_000;
+}
 
 describe("RankedList", () => {
   it("renders every factor with its signed points when an object is selected", () => {
@@ -77,6 +92,51 @@ describe("RankedList", () => {
 
     const list = screen.getByRole("region", { name: "Ranked observable objects" });
     expect(list.textContent).not.toContain("\u00b7");
+  });
+
+  describe("visible window", () => {
+    const visibleLine = (name: string) => {
+      const region = screen.getByRole("region", { name: `${name} visibility reasoning` });
+      return within(region).getByText(/^Visible /, { selector: "p" }).textContent;
+    };
+
+    it("discloses the accumulated hours when clouds open a gap between the first and last visible moment", () => {
+      const gappy = planNight({
+        latitude: 33.77,
+        longitude: -118.19,
+        date: "2026-11-17",
+        sky: "suburban",
+        equipment: "eye",
+        cloudCover: hourlyClouds((time) =>
+          time >= new Date("2026-11-18T03:00:00Z") && time <= new Date("2026-11-18T10:00:00Z") ? 100 : 0,
+        ),
+      });
+      const polaris = gappy.objects.find((object) => object.name === "Polaris");
+      if (!polaris) throw new Error("Expected Polaris to be visible outside the cloudy hours");
+      const span = hoursBetween(polaris.visibleFrom, polaris.visibleTo);
+      expect(span - polaris.hoursVisible).toBeGreaterThan(gappy.input.stepMinutes / 60);
+
+      const zone = gappy.input.timeZone;
+      render(<RankedList plan={gappy} selectedId={polaris.id} onSelect={() => {}} />);
+      expect(visibleLine(polaris.name)).toBe(
+        `Visible for ${polaris.hoursVisible.toFixed(1)} hours between ` +
+          `${formatTimeHHMM(polaris.visibleFrom, zone)} and ${formatTimeHHMM(polaris.visibleTo, zone)}`,
+      );
+    });
+
+    it("keeps the plain range when the object is visible throughout it", () => {
+      const step = samplePlan.input.stepMinutes / 60;
+      const continuous = samplePlan.objects.find(
+        (object) =>
+          Math.abs(hoursBetween(object.visibleFrom, object.visibleTo) - object.hoursVisible) <= step,
+      );
+      if (!continuous) throw new Error("Expected an object visible without gaps");
+      const zone = samplePlan.input.timeZone;
+      render(<RankedList plan={samplePlan} selectedId={continuous.id} onSelect={() => {}} />);
+      expect(visibleLine(continuous.name)).toBe(
+        `Visible ${formatTimeHHMM(continuous.visibleFrom, zone)} to ${formatTimeHHMM(continuous.visibleTo, zone)}`,
+      );
+    });
   });
 
   it("labels highlights with the best time and score, as toggle buttons", () => {
@@ -217,6 +277,23 @@ describe("RankedList", () => {
       };
       render(<RankedList plan={neverDark} selectedId={null} onSelect={() => {}} />);
       expect(emptyList().textContent).toContain("The sky never gets dark enough tonight");
+    });
+
+    it("says the forecast clouds hide everything on a fully overcast night", () => {
+      const overcast = planNight({
+        latitude: 33.77,
+        longitude: -118.19,
+        date: "2026-11-17",
+        sky: "suburban",
+        equipment: "eye",
+        cloudCover: hourlyClouds(() => 100),
+      });
+      expect(overcast.objects).toHaveLength(0);
+      expect(overcast.hidden.some((item) => item.reason === CLOUD_REASON)).toBe(true);
+      render(<RankedList plan={overcast} selectedId={null} onSelect={() => {}} />);
+      const text = emptyList().textContent ?? "";
+      expect(text).toContain("The forecast clouds hide everything tonight");
+      expect(text).not.toMatch(/darker sky|binoculars|telescope|never gets dark/);
     });
 
     it("keeps the sky and equipment advice for nights that do get dark", () => {
