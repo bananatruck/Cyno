@@ -20,6 +20,7 @@ export function usno(name: string) {
         data: CivilDate & {
           tz: number;
           fracillum: string;
+          curphase?: string;
           sundata: { phen: string; time: string | null }[];
           moondata: { phen: string; time: string | null }[];
         };

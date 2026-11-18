@@ -2,6 +2,7 @@ import { Body, Illumination, MakeTime, MoonPhase, SearchAltitude, SearchRiseSet 
 import type { Observer } from "astronomy-engine";
 import type { DarkWindow, Darkness, MoonInfo, NightCondition, SkyEvent, SkyEventKind } from "./types";
 import { bodyPosition } from "./positions";
+import { moonPhaseName } from "./moonPhase";
 import { DAY, HOUR } from "./time";
 export function darkness(alt: number): Darkness {
   return alt >= -0.833
@@ -128,16 +129,6 @@ export function moonInfo(observer: Observer, start: number, end: number, dark: D
   const time = MakeTime(new Date((a + b) / 2));
   const illumination = Illumination(Body.Moon, time);
   const phase = MoonPhase(time);
-  const names = [
-    "New Moon",
-    "Waxing Crescent",
-    "First Quarter",
-    "Waxing Gibbous",
-    "Full Moon",
-    "Waning Gibbous",
-    "Last Quarter",
-    "Waning Crescent",
-  ];
   let hoursUp = 0;
   if (dark) {
     const edges = [a, ...altitudeCrossings(Body.Moon, observer, a, b, 0), b];
@@ -155,7 +146,7 @@ export function moonInfo(observer: Observer, start: number, end: number, dark: D
   return {
     illumination: illumination.phase_fraction,
     phaseAngleDeg: illumination.phase_angle,
-    phaseName: names[Math.round(phase / 45) % 8] ?? "New Moon",
+    phaseName: moonPhaseName(phase, illumination.phase_fraction),
     hoursUpInDarkWindow: hoursUp,
   };
 }

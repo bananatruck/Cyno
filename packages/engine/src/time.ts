@@ -43,5 +43,5 @@ export function clockFormatter(timeZone: string): (time: string) => string {
     minute: "2-digit",
     hourCycle: "h23",
   });
-  return (time) => fmt.format(new Date(time));
+  return (time) => fmt.format(new Date(Math.round(Date.parse(time) / 60000) * 60000));
 }

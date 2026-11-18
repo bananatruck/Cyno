@@ -1,20 +1,11 @@
 import { Body, Illumination, MakeTime, Observer, Rotation_EQJ_HOR } from "astronomy-engine";
-import type {
-  BestMoment,
-  HiddenObject,
-  NightPlan,
-  ObjectKind,
-  PlanInput,
-  RankedObject,
-  TrackPoint,
-} from "./types";
+import type { HiddenObject, NightPlan, PlanInput, RankedObject } from "./types";
 import { resolveInput } from "./input";
-import { bodyPosition, bodies, catalog, catalogPosition, separation } from "./positions";
-import { cloudAt, clockFormatter, HOUR, nightWindow } from "./time";
+import { bodies, catalog, bodyPosition } from "./positions";
+import { clockFormatter, cloudAt, HOUR, nightWindow } from "./time";
 import { darkness, moonInfo, nightDarkness, skyEvents } from "./sky";
-import { effectiveMagnitude, limitingMagnitude } from "./brightness";
-import { rankFactors } from "./rank";
-import { summary } from "./describe";
+import { limitingMagnitude } from "./brightness";
+import { evaluateTarget } from "./evaluate";
 import { verdict } from "./verdict";
 export type * from "./types";
 export { parsePlanInput, PlanInputError, resolveTimeZone } from "./input";
@@ -49,6 +40,8 @@ export function planNight(input: PlanInput): NightPlan {
     });
     if (t === end) break;
   }
+  const lowestSunAltDeg = Math.min(...samples.map((s) => s.sun.altDeg));
+  const skyGetsDark = samples.some((s) => s.sun.altDeg < -0.833);
   const timeline = samples.map((s) => ({
     time: s.iso,
     sunAltDeg: s.sun.altDeg,
@@ -87,120 +80,9 @@ export function planNight(input: PlanInput): NightPlan {
   const objects: RankedObject[] = [],
     hidden: HiddenObject[] = [];
   for (const target of targets) {
-    const track: TrackPoint[] = [];
-    let best: {
-      moment: BestMoment;
-      noMoon: number;
-      separation: number | null;
-      illumination: number;
-      magnitude: number;
-    } | null = null;
-    let visibleFrom = "",
-      visibleTo = "",
-      hoursVisible = 0,
-      peakAltDeg = -90;
-    let highInDark = false,
-      brightInDark = false;
-    const kind: ObjectKind = target.kind;
-    for (const s of samples) {
-      const pos =
-        "body" in target.source
-          ? target.source.body === Body.Moon
-            ? s.moon
-            : bodyPosition(target.source.body, s.time, observer)
-          : catalogPosition(target.source.row, s.time, s.rotation);
-      track.push({ time: s.iso, ...pos });
-      peakAltDeg = Math.max(peakAltDeg, pos.altDeg);
-      if (s.sun.altDeg >= -0.833 || pos.altDeg < 10) continue;
-      highInDark = true;
-      const mag =
-        "body" in target.source
-          ? target.source.body === Body.Moon
-            ? s.illumination.mag
-            : Illumination(target.source.body, s.time).mag
-          : target.source.row.mag;
-      const sep = kind === "moon" ? null : separation(pos, s.moon);
-      const limit = (includeMoon: boolean) =>
-        limitingMagnitude(
-          resolved.sky,
-          resolved.equipment,
-          s.sun.altDeg,
-          pos.altDeg,
-          s.moon.altDeg,
-          s.illumination.phase_angle,
-          sep ?? 0,
-          includeMoon && kind !== "moon",
-        );
-      const effective = effectiveMagnitude(mag, pos.altDeg, kind);
-      const limitingMag = limit(true),
-        margin = limitingMag - effective;
-      if (margin < 0) continue;
-      brightInDark = true;
-      if (s.cloud !== null && s.cloud >= 80) continue;
-      if (!visibleFrom) visibleFrom = s.iso;
-      visibleTo = s.iso;
-      hoursVisible += s.duration;
-      if (
-        !best ||
-        margin > best.moment.marginMag ||
-        (margin === best.moment.marginMag && pos.altDeg > best.moment.altDeg)
-      )
-        best = {
-          moment: {
-            time: s.iso,
-            ...pos,
-            limitingMag,
-            effectiveMag: effective,
-            marginMag: margin,
-            cloudPercent: s.cloud,
-            darkness: darkness(s.sun.altDeg),
-          },
-          noMoon: limit(false) - effective,
-          separation: sep,
-          illumination: s.illumination.phase_fraction,
-          magnitude: mag,
-        };
-    }
-    if (!best) {
-      hidden.push({
-        id: target.id,
-        name: target.name,
-        kind,
-        reason: !highInDark
-          ? "Never gets higher than 10° while the sky is dark."
-          : !brightInDark
-            ? "Too faint for this sky and equipment."
-            : "Clouds block every otherwise visible moment.",
-      });
-      continue;
-    }
-    const factors = rankFactors(
-      best.moment,
-      hoursVisible,
-      best.noMoon,
-      best.separation,
-      best.illumination,
-      clock,
-    );
-    const score = Math.round(factors.reduce((sum, f) => sum + f.points, 0) * 10) / 10;
-    objects.push({
-      id: target.id,
-      name: target.name,
-      kind,
-      rank: 0,
-      score,
-      magnitude: best.magnitude,
-      constellation: target.constellation,
-      best: best.moment,
-      visibleFrom,
-      visibleTo,
-      hoursVisible,
-      peakAltDeg,
-      moonSeparationDeg: best.separation,
-      factors,
-      summary: summary(best.moment.time, best.moment.altDeg, best.moment.azDeg, clock),
-      track,
-    });
+    const result = evaluateTarget(target, samples, observer, resolved, clock, skyGetsDark);
+    if ("reason" in result) hidden.push(result);
+    else objects.push(result);
   }
   objects.sort(
     (a, b) => b.score - a.score || b.best.marginMag - a.best.marginMag || a.name.localeCompare(b.name),
@@ -216,7 +98,7 @@ export function planNight(input: PlanInput): NightPlan {
     events,
     moon,
     timeline,
-    verdict: verdict(resolved, darkWindow, moon, clock),
+    verdict: verdict(resolved, condition, darkWindow, moon, clock, lowestSunAltDeg),
     objects,
     hidden,
   };

@@ -1,4 +1,4 @@
-import type { DarkWindow, MoonInfo, ResolvedInput, Verdict } from "./types";
+import type { DarkWindow, MoonInfo, NightCondition, ResolvedInput, Verdict } from "./types";
 import { clamp } from "./rank";
 import { cloudAt, HOUR } from "./time";
 /** Forecast intervals are weighted by their actual overlap, with gaps kept unknown. */
@@ -25,14 +25,39 @@ export function meanCloud(input: ResolvedInput, dark: DarkWindow): number | null
   }
   return sum / (b - a);
 }
+function limitedDarknessReason(condition: NightCondition, lowestSunAltDeg: number): string {
+  const belowHorizon = Math.round(Math.min(0, lowestSunAltDeg) * -1);
+  switch (condition) {
+    case "polar-day":
+      return "The Sun never sets here tonight.";
+    case "white-night":
+      return "The Sun sets but stays within 6° of the horizon, so the sky never gets dark.";
+    case "no-nautical-darkness":
+      return `The sky only reaches nautical twilight: the Sun gets no lower than ${belowHorizon}° below the horizon.`;
+    case "no-astronomical-darkness":
+      return `The sky only reaches astronomical twilight: the Sun gets no lower than ${belowHorizon}° below the horizon.`;
+    default:
+      return "There is no astronomical darkness tonight.";
+  }
+}
+
 export function verdict(
   input: ResolvedInput,
+  condition: NightCondition,
   dark: DarkWindow | null,
   moon: MoonInfo,
   clock: (time: string) => string,
+  lowestSunAltDeg: number,
 ): Verdict {
-  if (!dark || dark.level === "civil-twilight")
-    return { label: "no-go", score: 0, reasons: ["There is no astronomical darkness tonight."] };
+  // SPEC: only a missing or civil-twilight-only dark window is an automatic no-go. A nautical-only
+  // window is still scored (with no darkness points) and gets the explanation as its first reason.
+  const usable = dark !== null && dark.level !== "civil-twilight";
+  if (!usable)
+    return {
+      label: "no-go",
+      score: 0,
+      reasons: [limitedDarknessReason(condition, lowestSunAltDeg)],
+    };
   const clouds = meanCloud(input, dark);
   const base =
     (dark.level === "night" || dark.level === "astronomical-twilight" ? 40 * clamp(dark.hours / 4) : 0) +
@@ -42,6 +67,7 @@ export function verdict(
     label: score >= 65 ? "go" : score >= 35 ? "marginal" : "no-go",
     score,
     reasons: [
+      ...(dark.level === "nautical-twilight" ? [limitedDarknessReason(condition, lowestSunAltDeg)] : []),
       `Dark from ${clock(dark.start)} to ${clock(dark.end)} (${dark.hours.toFixed(1)} hours).`,
       `The ${Math.round(moon.illumination * 100)}% Moon is up for ${moon.hoursUpInDarkWindow.toFixed(1)} dark hours.`,
       clouds === null ? "Cloud cover is unknown." : `Cloud cover averages ${Math.round(clouds)}%.`,
