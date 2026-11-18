@@ -29,7 +29,7 @@ const getRandomStartPoint = () => {
   const width = typeof window !== "undefined" ? window.innerWidth : 1200;
   const height = typeof window !== "undefined" ? window.innerHeight : 800;
   const side = Math.floor(Math.random() * 4);
-  const offset = Math.random() * width;
+  const offset = Math.random() * (side % 2 === 0 ? width : height);
 
   switch (side) {
     case 0:

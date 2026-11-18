@@ -22,11 +22,15 @@ export function NumberTicker({
   ...props
 }: NumberTickerProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const motionValue = useMotionValue(direction === "down" ? value : startValue);
+  const initiallyReduced =
+    typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  const initialValue = initiallyReduced ? value : direction === "down" ? value : startValue;
+  const motionValue = useMotionValue(initialValue);
   const springValue = useSpring(motionValue, {
     damping: 38,
     stiffness: 280,
   });
+  const [reducedMotion, setReducedMotion] = useState(initiallyReduced);
   const [isInView, setIsInView] = useState(() => typeof IntersectionObserver === "undefined");
 
   useEffect(() => {
@@ -55,20 +59,39 @@ export function NumberTicker({
     [decimalPlaces],
   );
 
+  const [displayedValue, setDisplayedValue] = useState(() => formatNumber(initialValue));
+
   useEffect(() => {
-    const reduceMotion =
-      typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      if (ref.current) {
-        ref.current.textContent = formatNumber(value);
-      }
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(
+    () => springValue.on("change", (latest) => setDisplayedValue(formatNumber(latest))),
+    [springValue, formatNumber],
+  );
+
+  useEffect(() => {
+    if (reducedMotion) {
+      springValue.stop();
+      motionValue.set(value);
+      springValue.jump(value);
       return;
     }
+
+    const start = direction === "down" ? value : startValue;
+    const target = direction === "down" ? startValue : value;
+    springValue.stop();
+    motionValue.set(start);
+    springValue.jump(start);
 
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (isInView) {
       timer = setTimeout(() => {
-        motionValue.set(direction === "down" ? startValue : value);
+        motionValue.set(target);
       }, delay * 1000);
     }
 
@@ -77,21 +100,11 @@ export function NumberTicker({
         clearTimeout(timer);
       }
     };
-  }, [motionValue, isInView, delay, value, direction, startValue, formatNumber]);
-
-  useEffect(
-    () =>
-      springValue.on("change", (latest) => {
-        if (ref.current) {
-          ref.current.textContent = formatNumber(latest);
-        }
-      }),
-    [springValue, formatNumber],
-  );
+  }, [motionValue, springValue, isInView, delay, value, direction, startValue, reducedMotion, formatNumber]);
 
   return (
     <span ref={ref} className={cn("inline-block tabular-nums text-starlight", className)} {...props}>
-      {formatNumber(value)}
+      {displayedValue}
     </span>
   );
 }

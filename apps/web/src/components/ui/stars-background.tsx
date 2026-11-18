@@ -29,6 +29,14 @@ export const StarsBackground: React.FC<StarsBackgroundProps> = ({
   className,
 }) => {
   const [stars, setStars] = useState<StarProps[]>([]);
+  const [reducedMotion, setReducedMotion] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
+  );
+  const [redMode, setRedMode] = useState(
+    () => typeof document !== "undefined" && document.documentElement.getAttribute("data-mode") === "red",
+  );
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const generateStars = useCallback(
@@ -79,6 +87,24 @@ export const StarsBackground: React.FC<StarsBackgroundProps> = ({
   }, [generateStars]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      setRedMode(root.getAttribute("data-mode") === "red");
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["data-mode"] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let ctx: CanvasRenderingContext2D | null = null;
@@ -89,30 +115,22 @@ export const StarsBackground: React.FC<StarsBackgroundProps> = ({
     }
     if (!ctx) return;
 
-    const reduceMotion =
-      typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
     let animationFrameId = 0;
-
-    const getRgb = () => {
-      const isRed = document.documentElement.getAttribute("data-mode") === "red";
-      return isRed ? "255, 90, 78" : "244, 239, 226";
-    };
 
     const render = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const rgb = getRgb();
+      const rgb = redMode ? "255, 90, 78" : "244, 239, 226";
       for (const star of stars) {
         ctx.beginPath();
         ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb}, ${star.opacity.toFixed(3)})`;
         ctx.fill();
 
-        if (!reduceMotion && star.twinkleSpeed !== null) {
+        if (!reducedMotion && star.twinkleSpeed !== null) {
           star.opacity = 0.25 + Math.abs(Math.sin((Date.now() * 0.001) / star.twinkleSpeed) * 0.5);
         }
       }
-      if (!reduceMotion) {
+      if (!reducedMotion) {
         animationFrameId = requestAnimationFrame(render);
       }
     };
@@ -122,7 +140,7 @@ export const StarsBackground: React.FC<StarsBackgroundProps> = ({
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
-  }, [stars]);
+  }, [stars, reducedMotion, redMode]);
 
   return (
     <canvas
