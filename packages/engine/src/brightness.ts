@@ -3,9 +3,15 @@ const k = 0.25;
 const radians = Math.PI / 180;
 export const skyBrightness = { city: 18, suburban: 19.5, rural: 21, dark: 21.7 };
 export const equipmentGain = { eye: 0, binoculars: 3, telescope: 5.5 };
-/** KS91 equation 3, scattering air mass. */
-export function airmass(alt: number): number {
+/** KS91 equation 3 (Rozenberg 1966), scattering air mass for moonlight paths. */
+export function scatteringAirmass(alt: number): number {
   return 1 / Math.sqrt(1 - 0.96 * Math.cos(alt * radians) ** 2);
+}
+/** KS91 equation 14 (Rozenberg 1966), extinction air mass for directly observed targets; 40 at the horizon. */
+export function extinctionAirmass(alt: number): number {
+  const cosZ = Math.cos((90 - alt) * radians);
+  const mass = 1 / (cosZ + 0.025 * Math.exp(-11 * cosZ));
+  return alt <= 0 ? Math.min(40, mass) : mass;
 }
 const toFlux = (mag: number) => 34.08 * Math.exp(20.7233 - 0.92104 * mag);
 const fromFlux = (flux: number) => (20.7233 - Math.log(flux / 34.08)) / 0.92104;
@@ -20,7 +26,12 @@ export function moonFlux(alt: number, moonAlt: number, phaseAngle: number, separ
   const mie =
     separation < 10 ? 6.2e7 / Math.max(Number.EPSILON, separation) ** 2 : 10 ** (6.15 - separation / 40);
   const scattering = 10 ** 5.36 * (1.06 + Math.cos(separation * radians) ** 2) + mie;
-  return scattering * intensity * 10 ** (-0.4 * k * airmass(moonAlt)) * (1 - 10 ** (-0.4 * k * airmass(alt)));
+  return (
+    scattering *
+    intensity *
+    10 ** (-0.4 * k * scatteringAirmass(moonAlt)) *
+    (1 - 10 ** (-0.4 * k * scatteringAirmass(alt)))
+  );
 }
 export function limitingMagnitude(
   sky: SkyQuality,
@@ -51,5 +62,5 @@ const penalty: Record<ObjectKind, number> = {
   "open-cluster": 0.5,
 };
 export function effectiveMagnitude(mag: number, alt: number, kind: ObjectKind): number {
-  return mag + k * (airmass(alt) - 1) + penalty[kind];
+  return mag + k * (extinctionAirmass(alt) - 1) + penalty[kind];
 }
