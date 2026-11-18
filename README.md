@@ -4,7 +4,7 @@ Design notes for an agentic astronomy assistant - a companion that answers
 space questions, plans stargazing around your location and the weather, and
 tells you when something worth looking at is about to happen.
 
-> **Milestone 1 is built: what can I see tonight.**
+> **Milestone 1 is built: what can I see tonight.** Try it at https://bananatruck.github.io/Cyno/
 > Give it a latitude, longitude and date, and it returns a ranked list of the objects you can actually see, with the reasoning for every rank, a sky chart and a night timeline.
 > It runs entirely in the browser with no keys, no server and no model calls.
 > The conversational assistant, notifications and everything else in the plans below are not built yet.
@@ -17,7 +17,7 @@ tells you when something worth looking at is about to happen.
 
 The desktop, phone and Red-Light screenshots show Long Beach, CA on 2026-11-17, and the third table image shows Tromso on 2026-06-21.
 The browser test takes them with the cloud forecast blocked, so they show computed data only.
-They are not deployed anywhere yet; see "Run it" to open the app locally.
+The app is live at **https://bananatruck.github.io/Cyno/**, deployed from `main` by the Pages workflow.
 
 ## What is here
 
@@ -108,7 +108,7 @@ Polar day, polar night and summer nights that never get fully dark are normal re
 **Visibility is an estimate from a sky-brightness model.**
 The sky's brightness is the sum of three sources: light pollution (a preset from city to dark site), twilight, and moonlight at the object's position from the Krisciunas and Schaefer (1991) model.
 That brightness sets a limiting magnitude, raised by a fixed amount for binoculars or a telescope.
-An object's magnitude is dimmed by the air it shines through and, for galaxies and nebulae, by a penalty for being spread out.
+An object's magnitude is dimmed by the air it shines through (using the paper's air mass for directly observed objects, which reaches 40 at the horizon) and, for galaxies and nebulae, by a penalty for being spread out.
 The difference is the margin: an object is visible when it is at least 10 degrees up, the Sun is below -0.833 degrees, the margin is zero or more, and clouds (when a forecast is available) are under 80 percent.
 The best moment is the visible sample with the largest margin.
 
@@ -127,6 +127,7 @@ The parts always add up to the score, so every rank can be checked by hand.
 The score measures how well you can see an object tonight, not how interesting it is, which is why bright stars rank high; the app's filters and highlights help with the second question.
 
 **The Go/No-Go verdict** weighs hours of real darkness (40 points), how much of that time a bright Moon is up (30) and the forecast cloud cover (30, left out and rescaled when there is no forecast).
+A night is always No-Go when the forecast averages 80 percent cloud or more over the dark hours, or when nothing at all is visible.
 
 ## How correctness is checked
 
