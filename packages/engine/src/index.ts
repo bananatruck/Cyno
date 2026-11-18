@@ -97,6 +97,18 @@ export function planNight(input: PlanInput): NightPlan {
   objects.forEach((o, i) => {
     o.rank = i + 1;
   });
+  const nightVerdict = verdict(resolved, condition, darkWindow, moon, clock, lowestSunAltDeg, parsedCloud);
+  // Scoring conditions alone cannot recommend a night with no observable targets. When the verdict is
+  // already no-go (no darkness, or clouds), its own reasons explain the empty list.
+  if (objects.length === 0 && nightVerdict.label !== "no-go") {
+    nightVerdict.label = "no-go";
+    nightVerdict.score = Math.min(nightVerdict.score, 34);
+    nightVerdict.reasons.push(
+      hidden.some((object) => object.reason === "Clouds block every otherwise visible moment.")
+        ? "Clouds block every otherwise visible moment."
+        : "Nothing is bright enough for this sky and equipment tonight.",
+    );
+  }
   return {
     input: resolved,
     window,
@@ -105,7 +117,7 @@ export function planNight(input: PlanInput): NightPlan {
     events,
     moon,
     timeline,
-    verdict: verdict(resolved, condition, darkWindow, moon, clock, lowestSunAltDeg, parsedCloud),
+    verdict: nightVerdict,
     objects,
     hidden,
   };

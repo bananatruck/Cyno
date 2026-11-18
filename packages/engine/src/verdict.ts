@@ -76,8 +76,8 @@ export function verdict(
   lowestSunAltDeg: number,
   parsedCloud: ParsedCloudCover | null = parseCloudCover(input.cloudCover),
 ): Verdict {
-  // SPEC: only a missing or civil-twilight-only dark window is an automatic no-go. A nautical-only
-  // window is still scored (with no darkness points) and gets the explanation as its first reason.
+  // A missing or civil-twilight-only window has no usable darkness. Nautical twilight is
+  // still scored without darkness points; extensive cloud cover can override that score.
   const usable = dark !== null && dark.level !== "civil-twilight";
   if (!usable)
     return {
@@ -90,10 +90,15 @@ export function verdict(
     (dark.level === "night" || dark.level === "astronomical-twilight" ? 40 * clamp(dark.hours / 4) : 0) +
     30 * (1 - moon.illumination * clamp(moon.hoursUpInDarkWindow / dark.hours));
   const score = clouds === null ? (base * 100) / 70 : base + 30 * (1 - clouds.mean / 100);
+  // meanCloud requires forecast coverage of at least half the dark window.
+  const cloudBlocked = clouds !== null && clouds.mean >= 80;
   return {
-    label: score >= 65 ? "go" : score >= 35 ? "marginal" : "no-go",
-    score,
+    label: cloudBlocked ? "no-go" : score >= 65 ? "go" : score >= 35 ? "marginal" : "no-go",
+    score: cloudBlocked ? Math.min(score, 34) : score,
     reasons: [
+      ...(cloudBlocked
+        ? [`Clouds cover the sky for most of the dark hours (${Math.round(clouds.mean)}% on average).`]
+        : []),
       ...(dark.level === "nautical-twilight" ? [limitedDarknessReason(condition, lowestSunAltDeg)] : []),
       formatDarkWindowReason(dark, clock),
       `The ${Math.round(moon.illumination * 100)}% Moon is up for ${moon.hoursUpInDarkWindow.toFixed(1)} dark hours.`,
