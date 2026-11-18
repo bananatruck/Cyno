@@ -62,13 +62,24 @@ export class PlanRunner {
     const id = ++this.nextId;
     this.pending.set(id, { input, worker, resolve });
     const message: WorkerRequest = { id, input };
-    worker.postMessage(message);
+    try {
+      worker.postMessage(message);
+    } catch {
+      this.pending.delete(id);
+      void computeOnMainThread(input).then(resolve);
+    }
   }
 
   private ensureWorker(): Worker | null {
     if (typeof Worker === "undefined" || this.failures >= MAX_WORKER_FAILURES) return null;
     if (this.worker) return this.worker;
-    const worker = new Worker(new URL("./plan.worker.ts", import.meta.url), { type: "module" });
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./plan.worker.ts", import.meta.url), { type: "module" });
+    } catch {
+      this.failures += 1;
+      return this.ensureWorker();
+    }
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => this.handleMessage(event.data);
     worker.onerror = (event) => {
       event.preventDefault?.();

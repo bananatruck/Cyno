@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build src/data/catalog.json from two published catalogs.
+"""Build src/data/catalog.json from published catalogs.
 
 Sources (downloaded by this script, never typed by hand):
 - IAU Catalog of Star Names (IAU-CSN), WGSN, https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt
@@ -8,6 +8,8 @@ Sources (downloaded by this script, never typed by hand):
   Used for the Messier objects: J2000 RA/Dec, V magnitude (B when V is missing), type, size, common name.
 - Harris, Catalog of Parameters for Milky Way Globular Clusters (2010 edition), https://physics.mcmaster.ca/~harris/mwgc.dat
   Used only to fill the integrated V magnitude (Part II, column 7) of globular clusters that OpenNGC leaves blank.
+- NGC 2000.0 (Dreyer, ed. R. W. Sinnott, 1988), as served by NASA HEASARC's Xamin service (table ngc2000):
+  used only for the visual magnitude of objects still without one after the sources above (M35 = NGC 2168).
 
 Run: python3 -I scripts/build-catalog.py   (from packages/engine)
 The output file is generated; edit this script, not the JSON.
@@ -26,6 +28,10 @@ IAU_URL = "https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt"
 NGC_URL = f"https://raw.githubusercontent.com/mattiaverga/OpenNGC/{OPENNGC_COMMIT}/database_files/NGC.csv"
 ADD_URL = f"https://raw.githubusercontent.com/mattiaverga/OpenNGC/{OPENNGC_COMMIT}/database_files/addendum.csv"
 HARRIS_URL = "https://physics.mcmaster.ca/~harris/mwgc.dat"
+HEASARC_URL = "https://heasarc.gsfc.nasa.gov/xamin/query?table=ngc2000&position={ra},{dec}&radius=5&format=text"
+# The HEASARC text response includes run-time messages, so it is pinned by value instead of by hash
+# (value read on 2026-11-18): designation -> visual magnitude.
+EXPECTED_NGC2000_VMAG = {"NGC2168": 5.1}
 STAR_MAG_LIMIT = 2.5
 OUT = Path(__file__).resolve().parent.parent / "src" / "data" / "catalog.json"
 
@@ -141,6 +147,34 @@ def harris_vt(text: str) -> dict[str, float]:
     return out
 
 
+def ngc2000_vmag(designation: str, ra_deg: float, dec_deg: float) -> float | None:
+    """Visual magnitude of one NGC object from NGC 2000.0 via HEASARC, or None if it has none.
+
+    Rows with an app_mag_flag (photographic magnitude) are not used. The result must match
+    EXPECTED_NGC2000_VMAG, so a rerun cannot silently change the catalog.
+    """
+    text = fetch(HEASARC_URL.format(ra=f"{ra_deg:.4f}", dec=f"{dec_deg:.4f}")).decode("utf-8")
+    # An empty or plain-text error response has no table; it falls through to the expected-value check
+    # below and stops the build, so a configured object can never be dropped silently.
+    lines = [line for line in text.splitlines() if "|" in line]
+    header = [h.strip() for h in lines[0].split("|")] if lines else []
+    want = re.sub(r"^NGC0*", "NGC ", designation)
+    value = None
+    for line in lines[1:]:
+        row = dict(zip(header, (c.strip() for c in line.split("|"))))
+        if row.get("name") == want and row.get("app_mag_flag") in ("", "null"):
+            value = float(row["app_mag"])
+    expected = EXPECTED_NGC2000_VMAG.get(designation)
+    if value != expected:
+        print(
+            f"Refusing to build: NGC 2000.0 magnitude for {designation} is {value}, expected {expected}.\n"
+            "Update EXPECTED_NGC2000_VMAG deliberately if HEASARC's table changed.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return value
+
+
 def messier(ngc_text: str, add_text: str, vt: dict[str, float]) -> tuple[list[dict], list[str]]:
     rows = []
     for text in (ngc_text, add_text):
@@ -156,8 +190,12 @@ def messier(ngc_text: str, add_text: str, vt: dict[str, float]) -> tuple[list[di
         mag_s, band, mag_src = (r["V-Mag"], "V", "OpenNGC") if r["V-Mag"] else (r["B-Mag"], "B", "OpenNGC")
         if not mag_s and r["Type"] == "GCl" and r["Name"] in vt:
             mag_s, band, mag_src = str(vt[r["Name"]]), "V", "Harris 2010"
+        if not mag_s and r["Name"] in EXPECTED_NGC2000_VMAG:
+            v = ngc2000_vmag(r["Name"], hms_to_deg(r["RA"]), dms_to_deg(r["Dec"]))
+            if v is not None:
+                mag_s, band, mag_src = str(v), "V", "NGC 2000.0 (HEASARC)"
         if not mag_s:
-            skipped.append(f"M{k} ({r['Name']}): no V or B magnitude in OpenNGC")
+            skipped.append(f"M{k} ({r['Name']}): no magnitude in OpenNGC, Harris 2010 or NGC 2000.0")
             continue
         common = r["Common names"].split(",")[0].strip() if r["Common names"] else ""
         out.append({
@@ -189,6 +227,7 @@ def main() -> int:
             "IAU-CSN": IAU_URL,
             "OpenNGC": f"https://github.com/mattiaverga/OpenNGC @ {OPENNGC_COMMIT} (CC-BY-SA-4.0), {NGC_URL}",
             "Harris 2010": HARRIS_URL,
+            "NGC 2000.0 (HEASARC)": "https://heasarc.gsfc.nasa.gov/W3Browse/all/ngc2000.html",
         },
         "starMagLimit": STAR_MAG_LIMIT,
         "skipped": skipped,

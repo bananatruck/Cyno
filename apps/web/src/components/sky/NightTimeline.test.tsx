@@ -152,6 +152,24 @@ describe("NightTimeline", () => {
     pointer("pointerup", 900);
     expect(releasePointerCapture).toHaveBeenCalledWith(7);
   });
+  it("shows one Moon altitude legend and curve when the Moon is selected", () => {
+    const moon = night.objects.find((object) => object.kind === "moon");
+    if (!moon) throw new Error("Expected Moon in Long Beach fixture");
+    const { container } = render(
+      <NightTimeline plan={night} time={first.time} selectedId={moon.id} onTimeChange={vi.fn()} />,
+    );
+    const legend = container.querySelector("figcaption");
+    if (!legend) throw new Error("Expected figcaption");
+    const entries = Array.from(legend.querySelectorAll("span"), (span) => span.textContent?.trim());
+    expect(entries.filter((entry) => entry === "Moon altitude")).toHaveLength(1);
+    const clip = container.querySelector("g[clip-path]");
+    const altitudeCurves = Array.from(clip?.querySelectorAll('path[fill="none"]') ?? []).filter((path) => {
+      const width = path.getAttribute("stroke-width");
+      return width === "1.5" || width === "2";
+    });
+    expect(altitudeCurves).toHaveLength(1);
+    expect(altitudeCurves[0]?.getAttribute("stroke-width")).toBe("2");
+  });
   it("renders and scrubs the full window during polar day", () => {
     const onTimeChange = vi.fn();
     render(

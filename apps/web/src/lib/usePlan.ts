@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { InputError, NightPlan, PlanInput } from "@cyno/engine";
 import { parsePlanInput } from "@cyno/engine/input";
 import { PlanRunner, type ComputeResult } from "./planRunner";
-import { fetchCloudForecast, type WeatherStatus } from "./weather";
+import { fetchCloudForecast, type ForecastStatus, type WeatherStatus } from "./weather";
 
 export type PlanStatus = "idle" | "computing" | "ready" | "error";
 
@@ -10,7 +10,7 @@ export type PlanStatus = "idle" | "computing" | "ready" | "error";
 export interface StalePlan {
   plan: NightPlan;
   label: string;
-  weatherStatus: WeatherStatus | "loading";
+  weatherStatus: ForecastStatus;
 }
 
 export interface UsePlanResult {
@@ -19,7 +19,7 @@ export interface UsePlanResult {
   status: PlanStatus;
   errors: InputError[];
   isWorkerError: boolean;
-  weatherStatus: WeatherStatus | "loading";
+  weatherStatus: ForecastStatus;
   /** While the current input computes, the last plan shown for a different input. */
   stalePlan: StalePlan | null;
   retry: () => void;
@@ -51,13 +51,25 @@ function displayedPlan(run: PlanRun): NightPlan | null {
   return run.base?.ok ? run.base.plan : null;
 }
 
-function runWeatherStatus(run: PlanRun): WeatherStatus | "loading" {
+/** The engine's sunset altitude: below it a sample counts as night for visibility. */
+const SUNSET_ALT_DEG = -0.833;
+
+/** How much of the night the forecast covers; with no night at all, how much of the window. */
+function forecastCoverage(plan: NightPlan): ForecastStatus {
+  const dark = plan.timeline.filter((sample) => sample.sunAltDeg < SUNSET_ALT_DEG);
+  const relevant = dark.length > 0 ? dark : plan.timeline;
+  const covered = relevant.filter((sample) => sample.cloudPercent !== null).length;
+  if (covered === 0) return "unavailable";
+  return covered === relevant.length ? "ok" : "partial";
+}
+
+function runWeatherStatus(run: PlanRun): ForecastStatus {
   if (run.weather !== "ok") return run.weather;
   switch (run.forecast.status) {
     case "computing":
       return "loading";
     case "ready":
-      return run.forecast.plan.timeline.some((sample) => sample.cloudPercent !== null) ? "ok" : "unavailable";
+      return forecastCoverage(run.forecast.plan);
     case "failed":
     case "none":
       return "unavailable";

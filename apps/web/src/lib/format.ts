@@ -1,5 +1,5 @@
 import type { DarkWindow, NightCondition, NightPlan, ObjectKind } from "@cyno/engine";
-import type { WeatherStatus } from "./weather";
+import type { ForecastStatus } from "./weather";
 
 /** Rounds to the nearest minute, as the engine does, so every clock time in the UI agrees with its reasons. */
 export function formatTimeHHMM(isoString: string, timeZone: string): string {
@@ -47,12 +47,14 @@ export function reasonsBesideDarkAndMoon(reasons: readonly string[]): string[] {
   return reasons.filter((reason) => !DARK_OR_MOON_REASON.test(reason));
 }
 
-export function describeWeatherStatus(status: WeatherStatus | "loading"): string {
+export function describeWeatherStatus(status: ForecastStatus): string {
   switch (status) {
     case "loading":
       return "Checking the Open-Meteo cloud forecast.";
     case "ok":
       return "Open-Meteo cloud forecast in use.";
+    case "partial":
+      return "Cloud forecast covers part of the night.";
     case "offline":
       return "No cloud forecast (offline). Ranking ignores clouds.";
     case "out-of-range":

@@ -42,15 +42,17 @@ export function horizons(name: string) {
     .trim()
     .split("\n")
     .map((line) => {
-      const match = /^\s*(\d{4}-[A-Za-z]{3}-\d{2}) (\d{2}:\d{2})\s+[*A-Za-z ]*?\s+([-\d.]+)\s+([-\d.]+)/.exec(
-        line,
-      );
+      const match =
+        /^\s*(\d{4}-[A-Za-z]{3}-\d{2}) (\d{2}:\d{2})\s+[*A-Za-z ]*?\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)/.exec(
+          line,
+        );
       if (!match) throw new Error(`Invalid Horizons row: ${line}`);
-      const [, date, time, az, alt] = match;
+      const [, date, time, az, alt, apMag] = match;
       return {
         time: new Date(`${date} ${time}:00 UTC`).toISOString(),
         azDeg: Number(az),
         altDeg: Number(alt),
+        apMag: Number(apMag),
       };
     });
 }

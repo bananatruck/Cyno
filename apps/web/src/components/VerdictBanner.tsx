@@ -6,7 +6,7 @@ import {
   formatDarkAndMoonSummary,
   reasonsBesideDarkAndMoon,
 } from "@/lib/format";
-import type { WeatherStatus } from "@/lib/weather";
+import type { ForecastStatus } from "@/lib/weather";
 import { BlurText } from "./ui/blur-text";
 import { NumberTicker } from "./ui/number-ticker";
 
@@ -15,7 +15,7 @@ export const VERDICT_ANCHOR_ID = "tonights-verdict";
 export interface VerdictBannerProps {
   plan: NightPlan;
   placeName: string;
-  weatherStatus?: WeatherStatus | "loading";
+  weatherStatus?: ForecastStatus;
 }
 
 function formatVerdictWord(label: VerdictLabel): string {

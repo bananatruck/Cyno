@@ -170,6 +170,33 @@ describe("SkyChart", () => {
       }
     }
   });
+  it("keeps the selected Moon label off the Moon disc when the Moon is above the horizon", () => {
+    const moon = night.objects.find((object) => object.kind === "moon");
+    if (!moon) throw new Error("Expected Moon in Long Beach fixture");
+    const localClock = new Intl.DateTimeFormat("en-GB", {
+      timeZone: night.input.timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const visibleSamples = night.timeline.filter((candidate) => {
+      const alt = nearest(moon.track, Date.parse(candidate.time))?.altDeg ?? -90;
+      return alt >= 0;
+    });
+    expect(visibleSamples.length).toBeGreaterThan(0);
+    for (const sample of visibleSamples) {
+      const localTime = localClock.format(new Date(sample.time));
+      cleanup();
+      render(<SkyChart plan={night} time={sample.time} selectedId={moon.id} onSelect={vi.fn()} />);
+      const moonDot = renderedObjectDots().find((dot) => dot.name === "Moon");
+      const moonLabel = renderedLabelBoxes().find((box) => box.objectName === "Moon");
+      if (!moonDot || !moonLabel) {
+        throw new Error(`Expected Moon marker and label at ${localTime}`);
+      }
+      const hitsOwnDisc = boxOverlapsCircle(moonLabel, moonDot.x, moonDot.y, moonDot.radius + DOT_PADDING);
+      expect(hitsOwnDisc, `${localTime}: Moon label overlaps Moon disc`).toBe(false);
+    }
+  });
   it("renders a button for each object above the horizon at the nearest sample", () => {
     const visible = night.objects.filter(
       (object) => (nearest(object.track, Date.parse(time))?.altDeg ?? -90) >= 0,
