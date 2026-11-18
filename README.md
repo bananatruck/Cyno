@@ -143,7 +143,7 @@ Where no published value exists, the tests check invariants instead: scores equa
 ## Data sources
 
 - Stars: the [IAU Catalog of Star Names](https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt), named stars brighter than magnitude 2.5.
-- Messier objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga (CC BY-SA 4.0), with globular cluster magnitudes that OpenNGC lacks taken from the [Harris catalog](https://physics.mcmaster.ca/~harris/mwgc.dat). M35 is left out because none of these sources gives its magnitude, and M102 because it has no agreed identification (OpenNGC files it under M101), which leaves 108 of the 110.
+- Messier objects: [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga (CC BY-SA 4.0), with globular cluster magnitudes that OpenNGC lacks taken from the [Harris catalog](https://physics.mcmaster.ca/~harris/mwgc.dat). M35, which neither gives a magnitude for, takes V 5.1 from NGC 2000.0 as served by [NASA HEASARC](https://heasarc.gsfc.nasa.gov/W3Browse/all/ngc2000.html). M102 is left out because it has no agreed identification (OpenNGC files it under M101), which leaves 109 of the 110.
 - Cloud cover: [Open-Meteo](https://open-meteo.com/), free and keyless, fetched by the browser and optional.
 
 `packages/engine/scripts/build-catalog.py` downloads the sources and regenerates `catalog.json`; the generated file is not edited by hand.

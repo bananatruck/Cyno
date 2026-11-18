@@ -44,4 +44,5 @@ The MIT permission notice is the same as Cyno's `LICENSE`.
 
 - OpenNGC by Mattia Verga, https://github.com/mattiaverga/OpenNGC, CC BY-SA 4.0: positions, magnitudes, types, sizes and common names of the Messier objects. The derived catalog data is shared under the same licence.
 - IAU Catalog of Star Names (WGSN), https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt: star names, positions and magnitudes.
+- NGC 2000.0 (Dreyer, ed. R. W. Sinnott, 1988; HEASARC copy of CDS VII/118), as served by NASA HEASARC (https://heasarc.gsfc.nasa.gov/W3Browse/all/ngc2000.html): the visual magnitude of M35 (NGC 2168).
 - Harris, Catalog of Parameters for Milky Way Globular Clusters (2010 edition), https://physics.mcmaster.ca/~harris/mwgc.dat: integrated V magnitudes of six globular clusters.
