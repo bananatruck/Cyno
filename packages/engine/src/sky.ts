@@ -123,26 +123,54 @@ export function nightDarkness(
     },
   };
 }
+function moonRiseSetInWindow(observer: Observer, start: number, end: number) {
+  const events: { kind: "moonrise" | "moonset"; t: number }[] = [];
+  for (const direction of [-1, 1] as const) {
+    let cursor = start;
+    while (cursor < end) {
+      const found = SearchRiseSet(Body.Moon, observer, direction, new Date(cursor), (end - cursor) / DAY);
+      if (!found || found.date.getTime() >= end) break;
+      events.push({ kind: direction > 0 ? "moonrise" : "moonset", t: found.date.getTime() });
+      cursor = found.date.getTime() + 1000;
+    }
+  }
+  return events.sort((x, y) => x.t - y.t);
+}
+function moonUpAt(observer: Observer, time: number): boolean {
+  const rise = SearchRiseSet(Body.Moon, observer, 1, new Date(time), -2);
+  const set = SearchRiseSet(Body.Moon, observer, -1, new Date(time), -2);
+  const riseT = rise?.date.getTime() ?? 0;
+  const setT = set?.date.getTime() ?? 0;
+  return riseT > setT;
+}
+function moonHoursUpInDarkWindow(
+  observer: Observer,
+  start: number,
+  end: number,
+  darkStart: number,
+  darkEnd: number,
+): number {
+  const events = moonRiseSetInWindow(observer, start, end);
+  // The Moon may have risen before the noon-to-noon window starts, so the state at dark start
+  // comes from the latest moonrise and moonset before it, wherever they fall.
+  let hours = 0;
+  let cursor = darkStart;
+  let state = moonUpAt(observer, darkStart);
+  for (const event of events.filter((e) => e.t > darkStart && e.t < darkEnd)) {
+    if (state) hours += (event.t - cursor) / HOUR;
+    state = event.kind === "moonrise";
+    cursor = event.t;
+  }
+  if (state) hours += (darkEnd - cursor) / HOUR;
+  return hours;
+}
 export function moonInfo(observer: Observer, start: number, end: number, dark: DarkWindow | null): MoonInfo {
   const a = dark ? Date.parse(dark.start) : start,
     b = dark ? Date.parse(dark.end) : end;
   const time = MakeTime(new Date((a + b) / 2));
   const illumination = Illumination(Body.Moon, time);
   const phase = MoonPhase(time);
-  let hoursUp = 0;
-  if (dark) {
-    const edges = [a, ...altitudeCrossings(Body.Moon, observer, a, b, 0), b];
-    for (let i = 1; i < edges.length; i++) {
-      const left = edges[i - 1],
-        right = edges[i];
-      if (
-        left !== undefined &&
-        right !== undefined &&
-        bodyPosition(Body.Moon, MakeTime(new Date((left + right) / 2)), observer).altDeg > 0
-      )
-        hoursUp += (right - left) / HOUR;
-    }
-  }
+  const hoursUp = dark ? moonHoursUpInDarkWindow(observer, start, end, a, b) : 0;
   return {
     illumination: illumination.phase_fraction,
     phaseAngleDeg: illumination.phase_angle,

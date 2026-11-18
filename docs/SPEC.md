@@ -75,8 +75,9 @@ The UI shows that breakdown for any object the user selects, and the hidden list
 ## Go/No-Go verdict
 
 Darkness points: `40 * clamp(darkWindowHours / 4, 0, 1)`, using only a dark window at night or astronomical-twilight level.
-Moon points: `30 * (1 - illumination * moonUpFraction)`, where moonUpFraction is the share of the dark window with the Moon up.
-Cloud points: `30 * (1 - meanCloud / 100)` over the dark window; when cloud cover is unknown these 30 points are left out and the other 70 are scaled to 100.
+Moon points: `30 * (1 - illumination * moonUpFraction)`, where moonUpFraction is the share of the dark window between the plan's own moonrise and moonset.
+Cloud points: `30 * (1 - meanCloud / 100)`, where meanCloud is the time-weighted mean over the parts of the dark window the forecast covers.
+When the forecast covers less than half of the dark window, cloud cover counts as unknown: these 30 points are left out and the other 70 are scaled to 100.
 Go at 65 or more, marginal from 35, no-go below 35; with no dark window at all (polar day, white night) the verdict is no-go.
 Reasons are plain sentences, for example "Dark from 18:15 to 05:20 (11.1 hours)."
 
