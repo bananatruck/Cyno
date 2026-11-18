@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@cyno/engine": "workspace:*",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@fontsource/cormorant-garamond": "^5.3.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.75.0",
     "motion": "^14.14.0",
