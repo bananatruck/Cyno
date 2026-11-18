@@ -127,7 +127,7 @@ The parts always add up to the score, so every rank can be checked by hand.
 The score measures how well you can see an object tonight, not how interesting it is, which is why bright stars rank high; the app's filters and highlights help with the second question.
 
 **The Go/No-Go verdict** weighs hours of real darkness (40 points), how much of that time a bright Moon is up (30) and the forecast cloud cover (30, left out and rescaled when there is no forecast).
-A night is always No-Go when the forecast averages 80 percent cloud or more over the dark hours, or when nothing at all is visible.
+A night is always No-Go when the forecast covers at least half of the dark hours and averages 80 percent cloud or more over the part it covers, or when nothing at all is visible.
 
 ## How correctness is checked
 
