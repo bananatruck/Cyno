@@ -59,6 +59,8 @@ export function evaluateTarget(
           : bodyPosition(target.source.body, s.time, observer)
         : catalogPosition(target.source.row, s.time, s.rotation);
     track.push({ time: s.iso, ...pos });
+    // The closing noon sample has zero duration: keep it on the track only.
+    if (s.duration === 0) continue;
     // Culmination can fall in daylight; peak altitude is dark-sky only when darkness exists tonight.
     const countsForPeak = skyNeverGetsDark || s.sun.altDeg < -0.833;
     if (countsForPeak) peakAltDeg = Math.max(peakAltDeg, pos.altDeg);
