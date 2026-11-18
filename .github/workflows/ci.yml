@@ -23,7 +23,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
+      # The browser test builds the web app itself (playwright.config.ts webServer), so there is no separate build step.
       - name: Browser smoke test
         run: |
           pnpm --filter @cyno/web exec playwright install --with-deps chromium
