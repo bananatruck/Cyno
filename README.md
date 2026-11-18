@@ -9,7 +9,14 @@ tells you when something worth looking at is about to happen.
 > It runs entirely in the browser with no keys, no server and no model calls.
 > The conversational assistant, notifications and everything else in the plans below are not built yet.
 
-<!-- SCREENSHOTS -->
+![Cyno on a desktop: the Go/No-Go verdict, the sky chart, the ranked list with Jupiter's reasoning open, and the night timeline](docs/screenshots/desktop.png)
+
+| Phone                                                          | Red-Light Mode                                                     | A night with no dark sky                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| ![Cyno on a phone, stacked layout](docs/screenshots/phone.png) | ![The same plan in Red-Light Mode](docs/screenshots/red-light.png) | ![Tromso at midsummer: the Sun never sets](docs/screenshots/polar-day.png) |
+
+The screenshots are taken by the browser test for Long Beach, CA on 2026-11-17 with the cloud forecast blocked, so they show computed data only.
+They are not deployed anywhere yet; see "Run it" to open the app locally.
 
 ## What is here
 
@@ -63,7 +70,7 @@ pnpm dev
 
 Then open the address Vite prints (usually http://localhost:5173).
 `pnpm check` runs the format check, lint, type-check, all tests and the production build.
-`pnpm --filter @cyno/web e2e` runs the browser smoke test and refreshes the screenshots.
+`pnpm --filter @cyno/web e2e` runs the browser tests and refreshes the screenshots; the first time, install the browser with `pnpm --filter @cyno/web exec playwright install chromium`.
 
 ## Using the app
 
