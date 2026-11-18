@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { nearest, trackPath } from "./chart-utils";
+import { clock, nearest, trackPath, zoneLabel } from "./chart-utils";
 import { project } from "./projection";
+
+describe("clock", () => {
+  it("rounds times to the nearest minute before formatting", () => {
+    expect(clock("UTC").format(new Date("2026-11-17T18:14:51Z"))).toBe("18:15");
+  });
+});
+
+describe("zoneLabel", () => {
+  it("turns the IANA zone location into a readable time label", () => {
+    expect(zoneLabel("America/Los_Angeles")).toBe("Los Angeles time");
+  });
+});
 
 describe("track sampling", () => {
   it("chooses the closest sample, using the earlier sample for a tie", () => {

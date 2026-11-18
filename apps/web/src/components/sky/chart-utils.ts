@@ -31,12 +31,23 @@ export function trackPath(
 }
 
 export function clock(timeZone: string, hourOnly = false) {
-  return new Intl.DateTimeFormat("en-GB", {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",
     ...(hourOnly ? {} : { minute: "2-digit" }),
     hourCycle: "h23",
   });
+  return {
+    format(value: Date | number) {
+      const instant = value instanceof Date ? value.getTime() : value;
+      return formatter.format(new Date(Math.round(instant / 60_000) * 60_000));
+    },
+  };
+}
+
+export function zoneLabel(timeZone: string) {
+  const location = timeZone.split("/").at(-1) ?? timeZone;
+  return `${location.replaceAll("_", " ")} time`;
 }
 
 export const colors = {

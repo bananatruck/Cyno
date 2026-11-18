@@ -30,7 +30,8 @@ describe("NightTimeline", () => {
     expect(labels[0]).toBe("17");
     expect(labels).toContain("00");
     expect(labels.at(-1)).toBe("06");
-    expect(screen.getByRole("slider").getAttribute("aria-valuetext")).toBe("16:50, America/Los_Angeles");
+    expect(screen.getByRole("slider").getAttribute("aria-valuetext")).toBe("16:50 Los Angeles time");
+    expect(screen.getByText("Los Angeles time")).toBeTruthy();
   });
   it("steps and jumps to exact sample times using the keyboard", () => {
     const onTimeChange = vi.fn();

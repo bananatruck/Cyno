@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { NightPlan, ObjectKind } from "@cyno/engine";
-import { clock, colors, nearest, trackPath } from "./chart-utils";
+import { clock, colors, nearest, trackPath, zoneLabel } from "./chart-utils";
 import { project } from "./projection";
 import "./sky.css";
 
@@ -25,21 +25,92 @@ const kindColors = {
   other: colors.starlight,
 } satisfies Record<ObjectKind, string>;
 const compass = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const CHART_RADIUS = 200;
+const LABEL_FONT_SIZE = 17;
+const LABEL_GAP = 13;
+const LABEL_PADDING = 2;
+
+interface LabelBox {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+interface LabelPlacement {
+  x: number;
+  y: number;
+  textAnchor: "start" | "middle" | "end";
+  box: LabelBox;
+}
+
+function labelBox(name: string, x: number, y: number, textAnchor: LabelPlacement["textAnchor"]) {
+  const width = name.length * LABEL_FONT_SIZE * 0.6;
+  const left = textAnchor === "end" ? x - width : textAnchor === "middle" ? x - width / 2 : x;
+  return {
+    left,
+    right: left + width,
+    top: y - LABEL_FONT_SIZE,
+    bottom: y + LABEL_FONT_SIZE * 0.2,
+  };
+}
+
+function overlaps(first: LabelBox, second: LabelBox) {
+  return (
+    first.left - LABEL_PADDING < second.right &&
+    first.right + LABEL_PADDING > second.left &&
+    first.top - LABEL_PADDING < second.bottom &&
+    first.bottom + LABEL_PADDING > second.top
+  );
+}
+
+function insideChart(box: LabelBox) {
+  return [
+    [box.left, box.top],
+    [box.right, box.top],
+    [box.left, box.bottom],
+    [box.right, box.bottom],
+  ].every(([x, y]) => Math.hypot(x ?? 0, y ?? 0) <= CHART_RADIUS);
+}
+
+function placeLabel(name: string, x: number, y: number, occupied: readonly LabelBox[]) {
+  const centeredBaseline = y + LABEL_FONT_SIZE * 0.4;
+  const candidates: Omit<LabelPlacement, "box">[] = [
+    { x: x + LABEL_GAP, y: centeredBaseline, textAnchor: "start" },
+    { x: x - LABEL_GAP, y: centeredBaseline, textAnchor: "end" },
+    { x, y: y - LABEL_GAP, textAnchor: "middle" },
+    { x, y: y + LABEL_GAP + LABEL_FONT_SIZE, textAnchor: "middle" },
+  ];
+  for (const candidate of candidates) {
+    const box = labelBox(name, candidate.x, candidate.y, candidate.textAnchor);
+    if (insideChart(box) && occupied.every((placed) => !overlaps(box, placed))) {
+      return { ...candidate, box };
+    }
+  }
+  return undefined;
+}
 
 export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyChartProps) {
   const id = useId();
   const visible = plan.objects.flatMap((object) => {
     const point = nearest(object.track, Date.parse(time));
-    const position = point && project(point.altDeg, point.azDeg, 200);
+    const position = point && project(point.altDeg, point.azDeg, CHART_RADIUS);
     return point && position ? [{ object, point, position }] : [];
   });
   const selected = plan.objects.find((object) => object.id === selectedId);
-  const labelled = new Set(
-    [...plan.objects]
-      .sort((a, b) => a.rank - b.rank)
-      .slice(0, 8)
-      .map((object) => object.id),
-  );
+  const labelPlacements = new Map<string, LabelPlacement>();
+  const occupied: LabelBox[] = [];
+  for (const { object, position } of [...visible].sort((first, second) => {
+    if (first.object.id === selectedId) return -1;
+    if (second.object.id === selectedId) return 1;
+    return first.object.rank - second.object.rank;
+  })) {
+    const placement = placeLabel(object.name, position.x, position.y, occupied);
+    if (placement) {
+      labelPlacements.set(object.id, placement);
+      occupied.push(placement.box);
+    }
+  }
   const illumination = Math.max(0, Math.min(1, plan.moon.illumination));
   const terminator = Math.abs(1 - 2 * illumination) * 7;
   const waning = plan.moon.phaseName.startsWith("Waning") || plan.moon.phaseName === "Last Quarter";
@@ -51,7 +122,14 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
         width="100%"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-summary`}
-        style={{ display: "block", overflow: "visible" }}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "auto",
+          maxWidth: "none",
+          aspectRatio: "1 / 1",
+          overflow: "visible",
+        }}
       >
         <title id={`${id}-title`}>Sky looking up, east on the left</title>
         <circle r="200" fill={colors.abyss} fillOpacity="0.55" stroke={colors.signal} strokeOpacity="0.45" />
@@ -64,7 +142,7 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
               strokeOpacity="0.2"
               strokeDasharray="2 5"
             />
-            <text x="5" y={(-200 * (90 - alt)) / 90 + 14} fontSize="10" opacity="0.75">
+            <text x="5" y={(-200 * (90 - alt)) / 90 + 14} fontSize="17" opacity="0.75">
               {alt}°
             </text>
           </g>
@@ -91,7 +169,7 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
             y={direction.y}
             textAnchor="middle"
             fill={colors.moonsilver}
-            fontSize="15"
+            fontSize="17"
           >
             {direction.name}
           </text>
@@ -100,7 +178,7 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
           const radius = Math.max(2.5, Math.min(6, 4.5 - object.magnitude * 0.5));
           const isSelected = object.id === selectedId;
           const label = `${object.name}, ${Math.round(point.altDeg)}° up, ${compass[Math.round((((point.azDeg % 360) + 360) % 360) / 45) % 8]}`;
-          const leftLabel = position.x > 120;
+          const labelPlacement = labelPlacements.get(object.id);
           return (
             <g
               key={object.id}
@@ -132,12 +210,12 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
               ) : (
                 <circle r={radius} fill={kindColors[object.kind]} />
               )}
-              {(labelled.has(object.id) || isSelected) && (
+              {labelPlacement && (
                 <text
-                  x={leftLabel ? -12 : 12}
-                  y="-9"
-                  textAnchor={leftLabel ? "end" : "start"}
-                  fontSize="13"
+                  x={labelPlacement.x - position.x}
+                  y={labelPlacement.y - position.y}
+                  textAnchor={labelPlacement.textAnchor}
+                  fontSize={LABEL_FONT_SIZE}
                   fill={colors.starlight}
                   style={{
                     fontFamily: "var(--font-display, 'Cormorant Garamond', serif)",
@@ -166,8 +244,8 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
           fontVariantNumeric: "tabular-nums",
         }}
       >
-        <time dateTime={time}>{clock(plan.input.timeZone).format(new Date(time))}</time> ·{" "}
-        {plan.input.timeZone}
+        <time dateTime={time}>{clock(plan.input.timeZone).format(new Date(time))}</time>{" "}
+        {zoneLabel(plan.input.timeZone)}
         {visible.length === 0 && (
           <span style={{ display: "block", marginTop: 8 }}>
             No planned objects above the horizon at this time. Try another time or date.

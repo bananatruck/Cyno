@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import type { Darkness, NightPlan } from "@cyno/engine";
-import { clock, colors, nearest, trackPath } from "./chart-utils";
+import { clock, colors, nearest, trackPath, zoneLabel } from "./chart-utils";
 import "./sky.css";
 
 export interface NightTimelineProps {
@@ -54,6 +54,7 @@ export function NightTimeline({ plan, time, onTimeChange, selectedId, className 
   const scrubberX = Math.max(0, Math.min(WIDTH, x(Date.parse(time))));
   const formatter = clock(plan.input.timeZone);
   const hours = clock(plan.input.timeZone, true);
+  const timeZoneLabel = zoneLabel(plan.input.timeZone);
   const ticks: number[] = [];
   // Find local hour boundaries, including zones with half-hour and quarter-hour offsets.
   const minuteFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -131,7 +132,7 @@ export function NightTimeline({ plan, time, onTimeChange, selectedId, className 
         aria-valuemin={Date.parse(first?.time ?? plan.window.start)}
         aria-valuemax={Date.parse(last?.time ?? plan.window.end)}
         aria-valuenow={currentTime}
-        aria-valuetext={`${formatter.format(new Date(currentTime))}, ${plan.input.timeZone}`}
+        aria-valuetext={`${formatter.format(new Date(currentTime))} ${timeZoneLabel}`}
         aria-describedby={`${id}-help`}
         onKeyDown={handleKey}
         onPointerDown={(event) => {
@@ -290,7 +291,7 @@ export function NightTimeline({ plan, time, onTimeChange, selectedId, className 
             ? `Darkest sky ${formatter.format(new Date(plan.darkWindow.start))} to ${formatter.format(new Date(plan.darkWindow.end))}`
             : "No dark window tonight"}
         </span>
-        <span>{plan.input.timeZone}</span>
+        <span>{timeZoneLabel}</span>
       </figcaption>
       <p className="cyno-sky-sr" id={`${id}-help`}>
         Drag to choose a time. Left and Right move one sample; Page Up and Page Down move one hour; Home and
