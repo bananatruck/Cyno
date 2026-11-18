@@ -146,8 +146,9 @@ function moonUpAt(observer: Observer, time: number): boolean {
     const alt = bodyPosition(Body.Moon, MakeTime(new Date(time)), observer).altDeg;
     return alt > MOON_RISE_SET_ALT_DEG;
   }
-  const riseT = rise?.date.getTime() ?? 0;
-  const setT = set?.date.getTime() ?? 0;
+  // Missing crossings must not sort as epoch zero; pre-1970 real times are negative.
+  const riseT = rise?.date.getTime() ?? Number.NEGATIVE_INFINITY;
+  const setT = set?.date.getTime() ?? Number.NEGATIVE_INFINITY;
   return riseT > setT;
 }
 function moonHoursUpInDarkWindow(
