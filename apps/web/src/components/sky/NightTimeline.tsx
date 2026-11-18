@@ -60,6 +60,7 @@ export function NightTimeline({
   const x = (instant: number) => ((instant - start) / duration) * WIDTH;
   const altitudeY = (alt: number) => BOTTOM - (Math.max(0, Math.min(90, alt)) / 90) * (BOTTOM - TOP);
   const selected = plan.objects.find((object) => object.id === selectedId);
+  const moonSelected = selected?.kind === "moon";
   const current = nearest(samples, Date.parse(time));
   const currentTime = current ? Date.parse(current.time) : start;
   const scrubberX = Math.max(0, Math.min(WIDTH, x(Date.parse(time))));
@@ -217,23 +218,35 @@ export function NightTimeline({
                 />
               ),
             )}
-            <path
-              d={moonPath}
-              fill="none"
-              stroke={colors.moonsilver}
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-            {selected && (
+            {moonSelected ? (
               <path
-                d={trackPath(selected.track, (point) =>
-                  point.altDeg < 0 ? null : { x: x(Date.parse(point.time)), y: altitudeY(point.altDeg) },
-                )}
+                d={moonPath}
                 fill="none"
                 stroke={colors.signal}
                 strokeWidth="2"
                 vectorEffect="non-scaling-stroke"
               />
+            ) : (
+              <>
+                <path
+                  d={moonPath}
+                  fill="none"
+                  stroke={colors.moonsilver}
+                  strokeWidth="1.5"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {selected && (
+                  <path
+                    d={trackPath(selected.track, (point) =>
+                      point.altDeg < 0 ? null : { x: x(Date.parse(point.time)), y: altitudeY(point.altDeg) },
+                    )}
+                    fill="none"
+                    stroke={colors.signal}
+                    strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+              </>
             )}
             {selected && (
               <path
@@ -297,8 +310,14 @@ export function NightTimeline({
         </div>
       </div>
       <figcaption style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 8, fontSize: 13 }}>
-        <span>Moon altitude</span>
-        {selected && <span style={{ color: colors.signal }}>{selected.name} altitude</span>}
+        {moonSelected ? (
+          <span style={{ color: colors.signal }}>Moon altitude</span>
+        ) : (
+          <>
+            <span>Moon altitude</span>
+            {selected && <span style={{ color: colors.signal }}>{selected.name} altitude</span>}
+          </>
+        )}
         {selected && (
           <span style={{ color: colors.horizon }}>Best {formatter.format(new Date(selected.best.time))}</span>
         )}
