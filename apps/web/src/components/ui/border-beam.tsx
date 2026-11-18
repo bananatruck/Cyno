@@ -1,7 +1,7 @@
 // Source: https://magicui.design/r/border-beam.json (https://magicui.design/docs/components/border-beam)
-// License: MIT
+// License: MIT, Copyright (c) Magic UI. See THIRD_PARTY_NOTICES.md.
 import type React from "react";
-import { m, type MotionStyle, type Transition } from "motion/react";
+import { m, useReducedMotion, type MotionStyle, type Transition } from "motion/react";
 import { cn } from "@/lib/utils";
 
 export interface BorderBeamProps {
@@ -31,6 +31,9 @@ export const BorderBeam = ({
   initialOffset = 0,
   borderWidth = 1.5,
 }: BorderBeamProps) => {
+  // Decorative and endless: with reduced motion the beam stays still. An endless animation would also
+  // keep starting style transitions every frame, so the page would never become idle.
+  const reduceMotion = useReducedMotion() ?? false;
   return (
     <div
       aria-hidden="true"
@@ -57,18 +60,26 @@ export const BorderBeam = ({
           } as MotionStyle
         }
         initial={{ offsetDistance: `${initialOffset}%` }}
-        animate={{
-          offsetDistance: reverse
-            ? [`${100 - initialOffset}%`, `${-initialOffset}%`]
-            : [`${initialOffset}%`, `${100 + initialOffset}%`],
-        }}
-        transition={{
-          repeat: Infinity,
-          ease: "linear",
-          duration,
-          delay: -delay,
-          ...transition,
-        }}
+        animate={
+          reduceMotion
+            ? { offsetDistance: `${initialOffset}%` }
+            : {
+                offsetDistance: reverse
+                  ? [`${100 - initialOffset}%`, `${-initialOffset}%`]
+                  : [`${initialOffset}%`, `${100 + initialOffset}%`],
+              }
+        }
+        transition={
+          reduceMotion
+            ? { duration: 0 }
+            : {
+                repeat: Infinity,
+                ease: "linear",
+                duration,
+                delay: -delay,
+                ...transition,
+              }
+        }
       />
     </div>
   );

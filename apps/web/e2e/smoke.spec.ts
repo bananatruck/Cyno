@@ -290,3 +290,24 @@ test("labels every control and keeps focus visible in red-light mode", async ({ 
       .toBe("solid 2px rgb(255, 90, 78)");
   }
 });
+
+test("stops decorative animation under reduced motion so the page goes idle", async ({ page }) => {
+  await page.route(OPEN_METEO, (route) => route.abort());
+  await page.goto(LONG_BEACH);
+  const rankedSection = page.getByRole("region", { name: "Ranked observable objects" });
+  await rankedSection.locator("button[aria-expanded]").first().click();
+  // A selected card carries the border beam; with reduced motion nothing may keep animating.
+  const runningFinite = () =>
+    page.evaluate(
+      () =>
+        document
+          .getAnimations()
+          .filter((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity)
+          .length,
+    );
+  await expect.poll(runningFinite, { timeout: 2_000 }).toBe(0);
+  for (let i = 0; i < 10; i++) {
+    expect(await runningFinite(), "no animation restarts once the page is idle").toBe(0);
+    await page.waitForTimeout(50);
+  }
+});
