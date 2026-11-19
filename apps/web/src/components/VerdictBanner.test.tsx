@@ -92,23 +92,27 @@ describe("VerdictBanner", () => {
   });
 
   it.each([
-    [64.8, "marginal", "Marginal", "64"],
-    [34.9, "no-go", "No-go", "34"],
-  ] as const)("keeps a score of %d inside its verdict band", (score, label, word, shown) => {
-    // Reduced motion makes the score ticker show its final value at once.
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === "(prefers-reduced-motion: reduce)",
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
-    const plan = { ...longBeach, verdict: { ...longBeach.verdict, score, label } };
-    render(<VerdictBanner plan={plan} placeName="Long Beach, CA" weatherStatus="offline" />);
-    const heading = screen.getByRole("heading", { level: 1 });
-    expect(heading.textContent).toContain(word);
-    expect(heading.textContent).toContain(shown);
-    expect(heading.textContent).not.toContain(String(Math.round(score)));
-  });
+    [false, 64.8, "marginal", "Marginal", "64"],
+    [true, 64.8, "marginal", "Marginal", "64"],
+    [false, 34.9, "no-go", "No-go", "34"],
+    [false, 65, "go", "Go", "65"],
+  ] as const)(
+    "with reduced motion %s, shows a score of %d as exactly its value inside its verdict band",
+    (reduced, score, label, word, shown) => {
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: reduced && query === "(prefers-reduced-motion: reduce)",
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+      const plan = { ...longBeach, verdict: { ...longBeach.verdict, score, label } };
+      render(<VerdictBanner plan={plan} placeName="Long Beach, CA" weatherStatus="offline" />);
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(heading.textContent).toContain(word);
+      expect(within(heading).getByText(shown, { exact: true })).toBeTruthy();
+      expect(heading.textContent?.replace(/\D/g, "")).toBe(shown);
+    },
+  );
 
   it("carries the anchor that the ranked list's empty state links to", () => {
     render(<VerdictBanner plan={longBeach} placeName="Long Beach, CA" weatherStatus="offline" />);
