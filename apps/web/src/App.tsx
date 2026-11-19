@@ -11,7 +11,16 @@ import { coordinatePlaceName, parseCoordinateText, readUrlState } from "@/lib/ur
 import { usePlan } from "@/lib/usePlan";
 
 const RED_MODE_STORAGE_KEY = "cyno:red-mode";
+const WEATHER_STORAGE_KEY = "cyno:weather-enabled";
 const TIMELINE_HEIGHT = 112;
+
+function readInitialWeatherEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(WEATHER_STORAGE_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 function readInitialRedMode(): boolean {
   try {
@@ -44,6 +53,15 @@ export default function App() {
   const [equipment, setEquipment] = useState<Equipment>(initial.equipment);
   const [placeName, setPlaceName] = useState(initial.placeName);
   const [redMode, setRedMode] = useState<boolean>(() => readInitialRedMode());
+  const [weatherEnabled, setWeatherEnabled] = useState(readInitialWeatherEnabled);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(WEATHER_STORAGE_KEY, weatherEnabled ? "1" : "0");
+    } catch {
+      // The setting still applies to this page when storage is unavailable.
+    }
+  }, [weatherEnabled]);
 
   const [selection, setSelection] = useState<{
     planKey: string | null;
@@ -96,7 +114,7 @@ export default function App() {
     weatherStatus,
     stalePlan,
     retry,
-  } = usePlan(rawPlanInput, placeName);
+  } = usePlan(rawPlanInput, placeName, weatherEnabled);
   const plan = currentPlan ?? stalePlan?.plan ?? null;
 
   const planIdentity = plan
@@ -297,6 +315,20 @@ export default function App() {
       </main>
 
       <footer className="relative z-10 mx-auto max-w-[1400px] border-t border-moonsilver/15 px-4 py-4 text-[13px] text-moonsilver md:px-6">
+        <label className="mb-1 flex cursor-pointer items-center gap-2 text-starlight">
+          <input
+            type="checkbox"
+            checked={weatherEnabled}
+            onChange={(event) => setWeatherEnabled(event.target.checked)}
+            aria-describedby="weather-privacy-note"
+          />
+          Use Open-Meteo cloud forecast
+        </label>
+        <p id="weather-privacy-note" className="mt-0 mb-3">
+          When enabled, your coordinates are sent to Open-Meteo. Turn this off to keep coordinates in your
+          browser for planning. Without a forecast, cloud cover is unknown; rankings and the verdict ignore
+          clouds. Positions, Moon information, sky chart and timeline still work.
+        </p>
         <p className="m-0">
           Positions computed with astronomy-engine. Visibility is an estimate;{" "}
           <a
@@ -306,6 +338,14 @@ export default function App() {
             className="text-signal underline underline-offset-2 hover:text-starlight"
           >
             see how ranking works
+          </a>
+          .{" "}
+          <a href="./THIRD_PARTY_NOTICES.md" className="text-signal underline underline-offset-2">
+            Third-party licences
+          </a>{" "}
+          and{" "}
+          <a href="./LICENSE" className="text-signal underline underline-offset-2">
+            Cyno licence
           </a>
           .
         </p>
