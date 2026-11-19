@@ -27,6 +27,19 @@ const FIELD_ERRORS_CLASS =
 
 type FieldWithError = "latitude" | "longitude" | "date";
 
+function describeGeolocationError(err: GeolocationPositionError): string {
+  switch (err.code) {
+    case err.PERMISSION_DENIED:
+      return "Location access was denied.";
+    case err.POSITION_UNAVAILABLE:
+      return "Your device could not determine its location.";
+    case err.TIMEOUT:
+      return "Your location could not be found in time.";
+    default:
+      return "Your location could not be found.";
+  }
+}
+
 function optionLabel<T extends string>(options: readonly SegmentOption<T>[], value: T): string {
   return options.find((option) => option.value === value)?.label ?? value;
 }
@@ -130,11 +143,7 @@ export function ControlsBar({
       (err) => {
         if (geoRequestRef.current !== requestId) return;
         setLocating(false);
-        setGeoStatus(
-          err.code === err.PERMISSION_DENIED
-            ? "Location access was denied. Choose a preset or enter coordinates manually."
-            : "Your location could not be found in time. Choose a preset or enter coordinates manually.",
-        );
+        setGeoStatus(`${describeGeolocationError(err)} Choose a preset or enter coordinates manually.`);
       },
       { timeout: 8000 },
     );
