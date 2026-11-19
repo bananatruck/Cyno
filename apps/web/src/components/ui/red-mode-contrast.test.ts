@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { planNight, type NightPlan } from "@cyno/engine";
 import { RankedList } from "../RankedList";
+import { PlaceCombobox } from "./place-combobox";
 
 const stylesheet = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 const redModeBlock = stylesheet.match(/html\[data-mode="red"\]\s*\{(?<tokens>[\s\S]*?)\}/)?.groups?.tokens;
@@ -213,5 +214,33 @@ describe("red-mode contrast of the ranked list, composed through its translucent
     expect(emptyPlan.objects).toHaveLength(0);
     const { container } = renderInPanel(emptyPlan, null);
     expectSmallTextToPass(container);
+  });
+});
+
+describe("red-mode contrast of the place picker, composed through its translucent layers", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("passes 4.5:1 for the search placeholder and every option", () => {
+    const { container } = render(
+      createElement(
+        "div",
+        { className: "bg-abyss text-starlight" },
+        createElement(
+          "header",
+          { className: "bg-abyss/85" },
+          createElement(PlaceCombobox, {
+            selectedName: "Long Beach, CA",
+            latitude: 33.77,
+            longitude: -118.19,
+            onSelectPreset: () => {},
+          }),
+        ),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Place preset: Long Beach, CA" }));
+    expectSmallTextToPass(screen.getByRole("dialog", { name: "Choose a preset place" }));
+    expect(container.querySelector("input[placeholder]")).not.toBeNull();
   });
 });

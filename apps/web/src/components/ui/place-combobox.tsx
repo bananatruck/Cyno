@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, MapPin } from "lucide-react";
 import { PLACE_PRESETS, type PlacePreset } from "@/lib/places";
+import { parseCoordinateText } from "@/lib/urlState";
 import { cn } from "@/lib/utils";
 
 export interface PlaceComboboxProps {
@@ -36,6 +37,10 @@ export function PlaceCombobox({
   );
   const optionId = (preset: PlacePreset) => `${listboxId}-option-${PLACE_PRESETS.indexOf(preset)}`;
   const activeOptionId = filtered[activeIndex] ? optionId(filtered[activeIndex]) : undefined;
+  const asCoordinate = (value: number | string) =>
+    typeof value === "number" ? value : parseCoordinateText(value);
+  const selectedLatitude = asCoordinate(latitude);
+  const selectedLongitude = asCoordinate(longitude);
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
@@ -75,6 +80,8 @@ export function PlaceCombobox({
           const next = !open;
           setOpen(next);
           if (next) {
+            // The listbox mounts scrolled to the top, so the active option starts there too.
+            setActiveIndex(0);
             setTimeout(() => inputRef.current?.focus(), 10);
           }
         }}
@@ -130,13 +137,13 @@ export function PlaceCombobox({
               }
             }}
             placeholder="Search preset places..."
-            className="mb-1.5 w-full rounded-lg border border-moonsilver/25 bg-nautical/60 px-2.5 py-1.5 text-[13px] text-starlight placeholder:text-moonsilver/70"
+            className="mb-1.5 w-full rounded-lg border border-moonsilver/25 bg-nautical/60 px-2.5 py-1.5 text-[13px] text-starlight placeholder:text-moonsilver"
           />
           <ul id={listboxId} role="listbox" aria-label="Preset places" className="max-h-56 overflow-y-auto">
             {filtered.map((preset, idx) => {
               const isSelected =
-                Math.abs(Number(latitude) - preset.latitude) < 0.005 &&
-                Math.abs(Number(longitude) - preset.longitude) < 0.005;
+                Math.abs(selectedLatitude - preset.latitude) < 0.005 &&
+                Math.abs(selectedLongitude - preset.longitude) < 0.005;
               const isHighlighted = idx === activeIndex;
               const id = optionId(preset);
               return (
