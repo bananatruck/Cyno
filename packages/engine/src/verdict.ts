@@ -1,6 +1,6 @@
-import type { DarkWindow, MoonInfo, NightCondition, ResolvedInput, Verdict } from "./types";
+import type { DarkWindow, MoonInfo, NightCondition, Verdict } from "./types";
 import { clamp } from "./rank";
-import { cloudAtParsed, HOUR, parseCloudCover, type ParsedCloudCover } from "./time";
+import { cloudAtParsed, HOUR, type ParsedCloudCover } from "./time";
 
 /** One sentence for the scored dark window, wording depends on how dark the sky gets. */
 export function formatDarkWindowReason(
@@ -21,9 +21,8 @@ export function formatDarkWindowReason(
 }
 /** Time-weighted mean over dark-window spans covered by hourly forecast samples. */
 export function meanCloud(
-  input: ResolvedInput,
   dark: DarkWindow,
-  parsedCloud: ParsedCloudCover | null = parseCloudCover(input.cloudCover),
+  parsedCloud: ParsedCloudCover | null,
 ): { mean: number; coveredFraction: number } | null {
   const a = Date.parse(dark.start),
     b = Date.parse(dark.end);
@@ -68,13 +67,12 @@ function limitedDarknessReason(condition: NightCondition, lowestSunAltDeg: numbe
 }
 
 export function verdict(
-  input: ResolvedInput,
   condition: NightCondition,
   dark: DarkWindow | null,
   moon: MoonInfo,
   clock: (time: string) => string,
   lowestSunAltDeg: number,
-  parsedCloud: ParsedCloudCover | null = parseCloudCover(input.cloudCover),
+  parsedCloud: ParsedCloudCover | null,
 ): Verdict {
   // A missing or civil-twilight-only window has no usable darkness. Nautical twilight is
   // still scored without darkness points; extensive cloud cover can override that score.
@@ -85,7 +83,7 @@ export function verdict(
       score: 0,
       reasons: [limitedDarknessReason(condition, lowestSunAltDeg)],
     };
-  const clouds = meanCloud(input, dark, parsedCloud);
+  const clouds = meanCloud(dark, parsedCloud);
   const base =
     (dark.level === "night" || dark.level === "astronomical-twilight" ? 40 * clamp(dark.hours / 4) : 0) +
     30 * (1 - moon.illumination * clamp(moon.hoursUpInDarkWindow / dark.hours));

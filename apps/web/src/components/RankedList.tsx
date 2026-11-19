@@ -68,11 +68,20 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
   const [showAll, setShowAll] = useState(false);
   const [filteredSelectionId, setFilteredSelectionId] = useState(selectedId);
 
+  const showInFilter = (object: RankedObject | undefined) => {
+    if (object && filter !== "all" && categorizeKind(object.kind) !== filter) setFilter("all");
+  };
+
   if (selectedId !== filteredSelectionId) {
     setFilteredSelectionId(selectedId);
-    const selected = plan.objects.find((obj) => obj.id === selectedId);
-    if (selected && filter !== "all" && categorizeKind(selected.kind) !== filter) setFilter("all");
+    showInFilter(plan.objects.find((obj) => obj.id === selectedId));
   }
+
+  // Selecting the already selected object keeps selectedId, so its activation must reveal it here.
+  const activate = (object: RankedObject) => {
+    showInFilter(object);
+    onSelect(object.id);
+  };
 
   const counts = useMemo(() => {
     const result = {
@@ -160,7 +169,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                 <button
                   key={groupLabel}
                   type="button"
-                  onClick={() => onSelect(object.id)}
+                  onClick={() => activate(object)}
                   aria-pressed={isSelected}
                   className={cn(
                     "flex cursor-pointer flex-col items-start rounded-lg border px-2 py-1 text-left transition-colors",
@@ -268,7 +277,7 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
                     type="button"
                     aria-expanded={isSelected}
                     aria-controls={isSelected ? reasoningId(object.id) : undefined}
-                    onClick={() => onSelect(object.id)}
+                    onClick={() => activate(object)}
                     className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2 text-left"
                   >
                     <div className="flex min-w-0 flex-col">

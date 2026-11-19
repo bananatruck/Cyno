@@ -8,7 +8,6 @@ import {
 } from "@/lib/format";
 import type { ForecastStatus } from "@/lib/weather";
 import { BlurText } from "./ui/blur-text";
-import { NumberTicker } from "./ui/number-ticker";
 
 export const VERDICT_ANCHOR_ID = "tonights-verdict";
 
@@ -31,7 +30,8 @@ function formatVerdictWord(label: VerdictLabel): string {
 
 export function VerdictBanner({ plan, placeName, weatherStatus = "ok" }: VerdictBannerProps) {
   const verdictWord = formatVerdictWord(plan.verdict.label);
-  // Rounding could lift a score into the next band (64.8 would read as the Go threshold, 65).
+  // Rounding could lift a score into the next band (64.8 would read as the Go threshold, 65), and a count-up
+  // would pass through the lower bands' scores, so the heading shows the floored score as it is.
   const shownScore = Math.floor(plan.verdict.score);
   const isNoGo = plan.verdict.label === "no-go";
   const summary = isNoGo ? null : formatDarkAndMoonSummary(plan);
@@ -44,10 +44,9 @@ export function VerdictBanner({ plan, placeName, weatherStatus = "ok" }: Verdict
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="m-0 flex items-baseline gap-2 font-display text-[34px] leading-none font-normal tracking-tight text-starlight md:text-[44px]">
           <BlurText text={verdictWord} animateBy="letters" delay={35} />
-          <NumberTicker
-            value={shownScore}
-            className="font-display text-[34px] font-normal tracking-tight text-starlight md:text-[44px]"
-          />
+          <span className="inline-block font-display text-[34px] font-normal tracking-tight tabular-nums text-starlight md:text-[44px]">
+            {shownScore}
+          </span>
         </h1>
         <p className="m-0 text-[13px] text-moonsilver">
           <span className="font-display text-[18px] text-starlight">{placeName}</span>,{" "}

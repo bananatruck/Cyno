@@ -90,6 +90,37 @@ describe("StarsBackground", () => {
 
     act(() => document.documentElement.setAttribute("data-mode", "red"));
     await waitFor(() => expect(context.fillStyle).toMatch(/^rgba\(255, 90, 78,/));
-    expect(context.arc.mock.calls.slice(-initialArcs.length)).toEqual(initialArcs);
+    expect(initialArcs.length).toBeGreaterThan(0);
+    expect(context.arc.mock.calls.slice(initialArcs.length)).toEqual(initialArcs);
+  });
+
+  it("stops animating when reduced motion turns on just before it subscribes", async () => {
+    const media = mediaQuery(false);
+    const original = window.matchMedia;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => {
+        const list = original(query);
+        return {
+          get matches() {
+            return list.matches;
+          },
+          addEventListener: (type: "change", listener: (event: MediaQueryListEvent) => void) => {
+            media.change(true);
+            list.addEventListener(type, listener);
+          },
+          removeEventListener: list.removeEventListener,
+        };
+      }),
+    );
+    const requestFrame = vi.fn(() => 17);
+    const cancelFrame = vi.fn();
+    vi.stubGlobal("requestAnimationFrame", requestFrame);
+    vi.stubGlobal("cancelAnimationFrame", cancelFrame);
+    render(<StarsBackground starDensity={0.00001} />);
+    await waitFor(() => expect(context.fill).toHaveBeenCalled());
+
+    // Every frame scheduled before the preference was read has been cancelled, and none is pending.
+    expect(requestFrame.mock.calls.length).toBe(cancelFrame.mock.calls.length);
   });
 });

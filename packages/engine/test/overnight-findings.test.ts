@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { Body, Illumination, MakeTime, Observer } from "astronomy-engine";
 import { parsePlanInput, planNight, PlanInputError } from "../src/index";
 import { moonInfo, MOON_RISE_SET_ALT_DEG } from "../src/sky";
-import { addCalendarDays, cloudAtParsed, HOUR, localNoon, nightWindow, parseCloudCover } from "../src/time";
+import {
+  addCalendarDays,
+  cloudAt,
+  cloudAtParsed,
+  HOUR,
+  localNoon,
+  nightWindow,
+  parseCloudCover,
+} from "../src/time";
 import { bodyPosition } from "../src/positions";
 import { horizons } from "./helpers";
 
@@ -18,8 +26,9 @@ describe("finding 1: circumpolar Moon when SearchRiseSet finds no crossing", () 
     const end = Date.parse(window.end);
     const alt = bodyPosition(Body.Moon, MakeTime(new Date((start + end) / 2)), observer).altDeg;
     expect(alt).toBeGreaterThan(MOON_RISE_SET_ALT_DEG);
+    expect(plan.darkWindow).not.toBeNull();
     const info = moonInfo(observer, start, end, plan.darkWindow);
-    if (plan.darkWindow) expect(info.hoursUpInDarkWindow).toBeGreaterThan(0);
+    expect(info.hoursUpInDarkWindow).toBeGreaterThan(0);
   });
 });
 
@@ -42,6 +51,22 @@ describe("finding 2: plan date range and safe calendar math", () => {
 });
 
 describe("finding 3: missing local calendar dates", () => {
+  it("rejects Africa/Khartoum 2000-01-15 when local noon was skipped", () => {
+    expect(() =>
+      planNight({ latitude: 15.5, longitude: 32.5, date: "2000-01-15", timeZone: "Africa/Khartoum" }),
+    ).toThrow(PlanInputError);
+    try {
+      planNight({ latitude: 15.5, longitude: 32.5, date: "2000-01-15", timeZone: "Africa/Khartoum" });
+    } catch (error) {
+      expect(error).toBeInstanceOf(PlanInputError);
+      if (error instanceof PlanInputError)
+        expect(error.errors).toContainEqual({
+          field: "date",
+          message: "Local noon does not exist on the selected date in this time zone.",
+        });
+    }
+  });
+
   it("rejects Pacific/Apia 2011-12-30", () => {
     expect(() =>
       planNight({ latitude: -13.83, longitude: -171.76, date: "2011-12-30", timeZone: "Pacific/Apia" }),
@@ -57,9 +82,36 @@ describe("finding 3: missing local calendar dates", () => {
         });
     }
   });
+
+  it("rejects Asia/Manila 1844-12-30 when the next calendar day was skipped", () => {
+    expect(() =>
+      planNight({ latitude: 14.6, longitude: 121, date: "1844-12-30", timeZone: "Asia/Manila" }),
+    ).toThrow(PlanInputError);
+    try {
+      planNight({ latitude: 14.6, longitude: 121, date: "1844-12-30", timeZone: "Asia/Manila" });
+    } catch (error) {
+      expect(error).toBeInstanceOf(PlanInputError);
+      if (error instanceof PlanInputError)
+        expect(error.errors).toContainEqual({
+          field: "date",
+          message: "The next calendar day is missing or has no local noon in this time zone.",
+        });
+    }
+  });
 });
 
 describe("finding 5: numeric offset time zones", () => {
+  it("returns a field error for a non-string time zone", () => {
+    const result = parsePlanInput({
+      latitude: 0,
+      longitude: 0,
+      date: "2026-06-21",
+      timeZone: { toString: null },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.errors).toContainEqual({ field: "timeZone", message: "Enter a known IANA time zone." });
+  });
   it.each(["+01:00", "-0530", "+0000"])("rejects offset %s", (timeZone) => {
     const result = parsePlanInput({ latitude: 0, longitude: 0, date: "2026-06-21", timeZone });
     expect(result.ok).toBe(false);
@@ -120,6 +172,14 @@ describe("finding 7: skyGetsDark vs condition at coarse steps", () => {
 });
 
 describe("finding 6 unit: parsed cloud cover", () => {
+  it("looks up out-of-order samples by timestamp", () => {
+    const samples = [
+      { time: "2026-11-18T02:00:00.000Z", percent: 100 },
+      { time: "2026-11-18T01:00:00.000Z", percent: 0 },
+    ];
+    expect(cloudAt(Date.parse("2026-11-18T01:30:00.000Z"), samples)).toBe(0);
+  });
+
   it("returns literal percents within the hour, then null past expiry or in gaps", () => {
     const parsed = parseCloudCover([
       { time: "2026-11-18T05:00:00.000Z", percent: 80 },
@@ -128,9 +188,24 @@ describe("finding 6 unit: parsed cloud cover", () => {
     expect(cloudAtParsed(Date.parse("2026-11-18T05:00:00.000Z"), parsed)).toBe(80);
     expect(cloudAtParsed(Date.parse("2026-11-18T05:59:59.999Z"), parsed)).toBe(80);
     expect(cloudAtParsed(Date.parse("2026-11-18T06:00:00.000Z"), parsed)).toBeNull();
-    expect(cloudAtParsed(Date.parse("2026-11-18T07:30:00.000Z"), parsed)).toBeNull();
-    expect(cloudAtParsed(Date.parse("2026-11-18T08:00:00.000Z"), parsed)).toBe(40);
-    expect(cloudAtParsed(Date.parse("2026-11-18T08:30:00.000Z"), parsed)).toBe(40);
+    expect(
+      cloudAt(Date.parse("2026-11-18T07:30:00.000Z"), [
+        { time: "2026-11-18T05:00:00.000Z", percent: 80 },
+        { time: "2026-11-18T08:00:00.000Z", percent: 40 },
+      ]),
+    ).toBeNull();
+    expect(
+      cloudAt(Date.parse("2026-11-18T08:00:00.000Z"), [
+        { time: "2026-11-18T05:00:00.000Z", percent: 80 },
+        { time: "2026-11-18T08:00:00.000Z", percent: 40 },
+      ]),
+    ).toBe(40);
+    expect(
+      cloudAt(Date.parse("2026-11-18T08:30:00.000Z"), [
+        { time: "2026-11-18T05:00:00.000Z", percent: 80 },
+        { time: "2026-11-18T08:00:00.000Z", percent: 40 },
+      ]),
+    ).toBe(40);
     expect(cloudAtParsed(Date.parse("2026-11-18T09:00:00.000Z"), parsed)).toBeNull();
   });
 });
@@ -210,5 +285,12 @@ describe("finding 8: DST night window endpoints", () => {
     const w = nightWindow(date, zone);
     expect(Date.parse(w.start)).toBe(start);
     expect(Date.parse(w.end)).toBe(end);
+    if (date === "2026-03-07") {
+      expect(w.start).toBe("2026-03-07T20:00:00.000Z");
+      expect(w.end).toBe("2026-03-08T19:00:00.000Z");
+    } else {
+      expect(w.start).toBe("2026-10-31T19:00:00.000Z");
+      expect(w.end).toBe("2026-11-01T20:00:00.000Z");
+    }
   });
 });

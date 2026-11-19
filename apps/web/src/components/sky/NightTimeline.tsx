@@ -28,15 +28,13 @@ const BOTTOM = 116;
 const VIEW_HEIGHT = 148;
 const LABEL_TOP = 130;
 
-export function NightTimeline({
-  plan,
-  time,
-  onTimeChange,
-  selectedId,
-  className,
-  height = VIEW_HEIGHT,
-}: NightTimelineProps) {
-  const id = useId();
+function isBetween(sample: { time: string }, from: number, to: number): boolean {
+  const instant = Date.parse(sample.time);
+  return instant >= from && instant <= to;
+}
+
+/** Sunset to sunrise when the window holds both, otherwise the whole window. */
+function stripRange(plan: NightPlan): { start: number; end: number } {
   const windowStart = Date.parse(plan.window.start);
   const windowEnd = Date.parse(plan.window.end);
   const sunset = plan.events.find(
@@ -49,12 +47,27 @@ export function NightTimeline({
       Date.parse(event.time) > Date.parse(sunset?.time ?? plan.window.start) &&
       Date.parse(event.time) <= windowEnd,
   );
-  const start = sunset && sunrise ? Date.parse(sunset.time) : windowStart;
-  const end = sunset && sunrise ? Date.parse(sunrise.time) : windowEnd;
+  if (!sunset || !sunrise) return { start: windowStart, end: windowEnd };
+  const night = { start: Date.parse(sunset.time), end: Date.parse(sunrise.time) };
+  // A plan step longer than the night can leave no sample between sunset and sunrise; the strip then
+  // covers the whole window, so it still has samples to select.
+  return plan.timeline.some((sample) => isBetween(sample, night.start, night.end))
+    ? night
+    : { start: windowStart, end: windowEnd };
+}
+
+export function NightTimeline({
+  plan,
+  time,
+  onTimeChange,
+  selectedId,
+  className,
+  height = VIEW_HEIGHT,
+}: NightTimelineProps) {
+  const id = useId();
+  const { start, end } = stripRange(plan);
   const duration = end - start;
-  const samples = plan.timeline.filter(
-    (sample) => Date.parse(sample.time) >= start && Date.parse(sample.time) <= end,
-  );
+  const samples = plan.timeline.filter((sample) => isBetween(sample, start, end));
   const first = samples[0];
   const last = samples.at(-1);
   const x = (instant: number) => ((instant - start) / duration) * WIDTH;

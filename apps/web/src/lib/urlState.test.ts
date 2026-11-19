@@ -43,6 +43,24 @@ describe("readUrlState", () => {
     expect(state.placeName).not.toContain("33.00");
   });
 
+  it.each([
+    ["%2B45", "45"],
+    ["5.", "5"],
+    [".5", "0.5"],
+    ["-.5", "-0.5"],
+    ["%20%2012.50%20", "12.50"],
+    ["45", "45"],
+    ["-118.19", "-118.19"],
+  ])("rewrites the accepted URL latitude %j as %j, which a number input can show", (raw, shown) => {
+    const state = readUrlState(`?lat=${raw}&lon=20`, NOW);
+    expect(state.latText).toBe(shown);
+    expect(parseCoordinateText(state.latText)).toBe(parseCoordinateText(decodeURIComponent(raw)));
+  });
+
+  it("rewrites an accepted URL longitude the same way", () => {
+    expect(readUrlState("?lat=10&lon=%2B20.", NOW).lonText).toBe("20");
+  });
+
   it("names a matching preset and formats other coordinates", () => {
     expect(readUrlState("?lat=35.68&lon=139.69", NOW).placeName).toBe("Tokyo");
     expect(readUrlState("?lat=10&lon=20", NOW).placeName).toBe("10.00°, 20.00°");

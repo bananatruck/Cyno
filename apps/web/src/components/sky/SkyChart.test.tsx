@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { SkyChart } from "./SkyChart";
 import { nearest } from "./chart-utils";
 import { night, polarDay } from "./test-plans";
+import { planNight } from "@cyno/engine";
 
 afterEach(cleanup);
 const time = "2026-11-18T05:03:00.000Z";
@@ -83,6 +84,24 @@ function renderedLabelBoxes() {
 }
 
 describe("SkyChart", () => {
+  it("draws Suhail from the catalogue on a southern night and lets it be selected", () => {
+    const plan = planNight({
+      latitude: -34,
+      longitude: 151,
+      date: "2026-07-15",
+      timeZone: "Australia/Sydney",
+    });
+    const suhail = plan.objects.find((object) => object.id === "star-suhail");
+    if (!suhail) throw new Error("Expected Suhail in the southern night plan");
+    const onSelect = vi.fn();
+    render(<SkyChart plan={plan} time={suhail.best.time} selectedId={suhail.id} onSelect={onSelect} />);
+    const marker = screen.getByRole("button", { name: /^Suhail,/ });
+    const dot = renderedObjectDots().find((candidate) => candidate.name === "Suhail");
+    expect(dot?.radius).toBeGreaterThan(0);
+    expect(marker.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(marker, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith("star-suhail");
+  });
   it("fills its container as a square with readable labels at 320 pixels", () => {
     render(<SkyChart plan={night} time={time} selectedId={null} onSelect={vi.fn()} />);
     const svg = document.querySelector("figure > svg");
@@ -278,13 +297,14 @@ describe("SkyChart", () => {
       return { x: Number(match[1]), y: Number(match[2]) };
     });
     expect(Math.hypot(centers[0]!.x - centers[1]!.x, centers[0]!.y - centers[1]!.y)).toBeCloseTo(8);
+    expect(centers[1]!.x).toBeCloseTo(centers[0]!.x);
+    expect(centers[1]!.y - centers[0]!.y).toBeCloseTo(8);
 
-    fireEvent.click(svg, {
-      clientX: centers[0]!.x + 240,
-      clientY: centers[0]!.y + 243,
-    });
+    // Both clicks land inside both 13-unit hit areas: 3 and 5 units away, then 6 and 2 units away.
+    fireEvent.click(svg, { clientX: centers[0]!.x + 240, clientY: centers[0]!.y + 243 });
+    fireEvent.click(svg, { clientX: centers[0]!.x + 240, clientY: centers[0]!.y + 246 });
 
-    expect(onSelect).toHaveBeenCalledWith(firstObject.id);
+    expect(onSelect.mock.calls).toEqual([[firstObject.id], [secondObject.id]]);
   });
   it("renders an empty polar day without a dark window", () => {
     expect(polarDay.objects).toHaveLength(0);

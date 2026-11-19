@@ -55,7 +55,7 @@ export function parsePlanInput(raw: unknown): ParseResult {
     } catch {
       error(
         "timeZone",
-        isOffsetTimeZone(String(timeZone))
+        typeof timeZone === "string" && isOffsetTimeZone(timeZone)
           ? "Use a named IANA time zone or UTC, not a numeric UTC offset."
           : "Enter a known IANA time zone.",
       );
