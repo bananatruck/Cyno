@@ -76,7 +76,7 @@ Then open the address Vite prints (usually http://localhost:5173).
 ## Deploy
 
 `.github/workflows/pages.yml` builds `apps/web` and publishes it to GitHub Pages on every push to `main`.
-Pages must use GitHub Actions as its source before the first run: Settings, Pages, Source, GitHub Actions, or `gh api -X POST repos/bananatruck/Cyno/pages -f build_type=workflow`.
+Pages must use GitHub Actions as its source before the first run: Settings, Pages, Source, GitHub Actions, or `gh api -X POST repos/bananatruck/Cyno/pages -f build_type=workflow` when no Pages site exists yet (use `-X PUT` with the same field to switch an existing site to GitHub Actions).
 The build uses relative asset paths, so the same output works at the root of a domain and under `/Cyno/`.
 
 ## Using the app
@@ -89,7 +89,7 @@ The build uses relative asset paths, so the same output works at the root of a d
 - "Not visible tonight" lists every catalog object that did not make it, with the reason.
 - Red-Light Mode turns the whole interface deep red to protect night vision, and is remembered in your browser.
 - The address bar always holds the place, date, sky and equipment, so a plan can be shared as a link.
-- Once the page has loaded, every calculation runs in the browser with no network; only the optional cloud forecast needs a connection. Loading the page itself needs a connection, as there is no offline install yet. Without a forecast the app says so and ranks without clouds instead of assuming a clear sky.
+- Once the page has loaded, every calculation runs in the browser with no network; only the optional cloud forecast needs a connection. Loading the page itself needs a connection, as there is no offline install yet. Without a forecast the app says so and ranks without clouds instead of assuming a clear sky. One exception: after the page goes offline, a retry following a failed calculation worker has to fetch the worker (or, after a second failure, the main-thread fallback) again, and that fails if the browser has not cached it.
 
 ## How the ranking works
 
