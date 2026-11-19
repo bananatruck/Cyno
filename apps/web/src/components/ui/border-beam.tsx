@@ -1,7 +1,8 @@
 // Source: https://magicui.design/r/border-beam.json (https://magicui.design/docs/components/border-beam)
 // License: MIT, Copyright (c) Magic UI. See THIRD_PARTY_NOTICES.md.
 import type React from "react";
-import { m, useReducedMotion, type MotionStyle, type Transition } from "motion/react";
+import { m, type MotionStyle, type Transition } from "motion/react";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 
 export interface BorderBeamProps {
@@ -33,7 +34,7 @@ export const BorderBeam = ({
 }: BorderBeamProps) => {
   // Decorative and endless: with reduced motion the beam stays still. An endless animation would also
   // keep starting style transitions every frame, so the page would never become idle.
-  const reduceMotion = useReducedMotion() ?? false;
+  const reduceMotion = usePrefersReducedMotion();
   return (
     <div
       aria-hidden="true"
@@ -45,6 +46,8 @@ export const BorderBeam = ({
       }
     >
       <m.div
+        data-border-beam=""
+        data-motion={reduceMotion ? "static" : "animated"}
         className={cn(
           "absolute aspect-square",
           "bg-linear-to-l from-(--color-from) via-(--color-to) to-transparent",

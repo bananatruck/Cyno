@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { waitForPageSettle } from "../src/lib/page-settle";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const screenshotsDir = path.resolve(__dirname, "../../../docs/screenshots");
@@ -25,39 +26,10 @@ function screenshotPath(name: string) {
 
 /** Waits until web fonts are loaded and every finite animation or transition has finished. */
 async function settle(page: Page) {
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   try {
-    await page.waitForFunction(
-      () =>
-        document
-          .getAnimations()
-          .every(
-            (animation) =>
-              animation.playState !== "running" || animation.effect?.getComputedTiming().endTime === Infinity,
-          ),
-      undefined,
-      { timeout: 5_000 },
-    );
+    await page.evaluate(waitForPageSettle);
   } catch (error) {
-    // Fail fast and name what keeps animating, instead of letting the test time out somewhere later.
-    const running = await page.evaluate(() =>
-      document
-        .getAnimations()
-        .filter((animation) => animation.playState === "running")
-        .map((animation) => {
-          const target = (animation.effect as KeyframeEffect | null)?.target;
-          const name =
-            animation instanceof CSSTransition
-              ? `transition ${animation.transitionProperty}`
-              : animation instanceof CSSAnimation
-                ? `animation ${animation.animationName}`
-                : "script animation";
-          return `${name} on ${target?.tagName.toLowerCase()}.${target?.getAttribute("class") ?? ""}`;
-        }),
-    );
-    throw new Error(`The page did not settle within 5 s. Still running: ${running.join("; ")}`, {
-      cause: error,
-    });
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }
 
@@ -335,4 +307,44 @@ test("stops decorative animation under reduced motion so the page goes idle", as
     expect(await runningFinite(), "no animation restarts once the page is idle").toBe(0);
     await page.waitForTimeout(50);
   }
+
+  const beam = rankedSection.locator("[data-border-beam]").first();
+  await expect(beam).toBeVisible();
+  const offsetSamples = await page.evaluate(async () => {
+    const element = document.querySelector("[data-border-beam]");
+    if (!(element instanceof HTMLElement)) {
+      throw new Error("Expected a border beam element");
+    }
+    const read = () => getComputedStyle(element).offsetDistance;
+    const samples: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      samples.push(read());
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    return samples;
+  });
+  expect(new Set(offsetSamples).size, "border beam offset-distance stays constant under reduced motion").toBe(
+    1,
+  );
+});
+
+test("settle gives up after its deadline even with the browser clock fixed", async ({ page }) => {
+  test.setTimeout(20_000);
+  // beforeEach fixed Date.now(); performance.now() must still advance, or no deadline can fire.
+  await page.setContent("<div id='busy' style='width:10px;height:10px'></div>");
+  const clocks = await page.evaluate(async () => {
+    const d0 = Date.now();
+    const p0 = performance.now();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return { date: Date.now() - d0, perf: performance.now() - p0 };
+  });
+  expect(clocks.date, "Date.now() is frozen by the fixed clock").toBe(0);
+  expect(clocks.perf, "performance.now() keeps running").toBeGreaterThan(250);
+  // A finite animation that outlasts the deadline keeps the page busy.
+  await page.evaluate(() => {
+    document.getElementById("busy")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 60_000 });
+  });
+  const started = Date.now();
+  await expect(page.evaluate(waitForPageSettle)).rejects.toThrow(/did not settle within 5000 ms/);
+  expect(Date.now() - started).toBeLessThan(10_000);
 });
