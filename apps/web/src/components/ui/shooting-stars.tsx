@@ -1,6 +1,7 @@
 // Source: https://ui.aceternity.com/registry/shooting-stars.json (https://ui.aceternity.com/components/shooting-stars-and-stars-background)
 // License: Aceternity UI licence (https://ui.aceternity.com/licence); allows use in end products, not redistribution as a component.
 import React, { useEffect, useId, useRef, useState } from "react";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 
 interface ShootingStar {
@@ -57,21 +58,9 @@ export const ShootingStars: React.FC<ShootingStarsProps> = ({
   className,
 }) => {
   const [star, setStar] = useState<ShootingStar | null>(null);
-  const [reducedMotion, setReducedMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
-  );
+  const reducedMotion = usePrefersReducedMotion();
   const svgRef = useRef<SVGSVGElement>(null);
   const gradientId = useId();
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
 
   useEffect(() => {
     if (reducedMotion) return;

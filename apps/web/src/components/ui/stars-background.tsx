@@ -1,6 +1,7 @@
 // Source: https://ui.aceternity.com/registry/stars-background.json (https://ui.aceternity.com/components/shooting-stars-and-stars-background)
 // License: Aceternity UI licence (https://ui.aceternity.com/licence); allows use in end products, not redistribution as a component.
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 
 interface StarProps {
@@ -29,11 +30,7 @@ export const StarsBackground: React.FC<StarsBackgroundProps> = ({
   className,
 }) => {
   const [stars, setStars] = useState<StarProps[]>([]);
-  const [reducedMotion, setReducedMotion] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
-  );
+  const reducedMotion = usePrefersReducedMotion();
   const [redMode, setRedMode] = useState(
     () => typeof document !== "undefined" && document.documentElement.getAttribute("data-mode") === "red",
   );
@@ -85,14 +82,6 @@ export const StarsBackground: React.FC<StarsBackgroundProps> = ({
       resizeObserver.disconnect();
     };
   }, [generateStars]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
 
   useEffect(() => {
     if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
