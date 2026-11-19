@@ -76,16 +76,30 @@ function runWeatherStatus(run: PlanRun): ForecastStatus {
   }
 }
 
+/** What a superseded run displayed. Its cleanup cancelled any unfinished forecast, which will never load. */
 function displayedRun(run: PlanRun | null): DisplayedRun | null {
   const plan = run && displayedPlan(run);
   if (!run || !plan) return null;
-  return { plan, label: run.label, inputKey: run.inputKey, weatherStatus: runWeatherStatus(run) };
+  const status = runWeatherStatus(run);
+  return {
+    plan,
+    label: run.label,
+    inputKey: run.inputKey,
+    weatherStatus: status === "loading" ? "unavailable" : status,
+  };
 }
 
-export function usePlan(rawInput: unknown, label: string): UsePlanResult {
-  const [retryCount, setRetryCount] = useState(0);
+export function usePlan(rawInput: unknown, label: string, weatherEnabled = true): UsePlanResult {
   const inputKey = JSON.stringify(rawInput);
-  const requestKey = `${inputKey}::${retryCount}`;
+  const computationKey = `${inputKey}::${weatherEnabled}`;
+  // Every input transition and every retry is a new computation, even when an earlier input returns.
+  const [computation, setComputation] = useState({ inputKey: computationKey, id: 0 });
+  let computationId = computation.id;
+  if (computation.inputKey !== computationKey) {
+    computationId += 1;
+    setComputation({ inputKey: computationKey, id: computationId });
+  }
+  const requestKey = String(computationId);
 
   const parsed = useMemo(() => {
     try {
@@ -127,43 +141,49 @@ export function usePlan(rawInput: unknown, label: string): UsePlanResult {
           inputKey,
           label: runLabel,
           base: null,
-          weather: "loading",
+          weather: weatherEnabled ? "loading" : "disabled",
           forecast: { status: "none" },
         };
         return { run: change(fresh), previous: displayedRun(prev.run) ?? prev.previous };
       });
     };
 
-    void runner.compute(input).then((base) => update((run) => ({ ...run, base })));
-
     const abortController = new AbortController();
-    void fetchCloudForecast(input.latitude, input.longitude, input.date, {
-      signal: abortController.signal,
-    }).then((weather) => {
-      const usable = weather.status === "ok" && weather.samples.length > 0;
-      update((run) => ({
-        ...run,
-        weather: weather.status,
-        forecast: usable ? { status: "computing" } : { status: "none" },
-      }));
-      if (!usable || cancelled) return;
-      void runner.compute({ ...input, cloudCover: weather.samples }).then((result) =>
+    const { signal } = abortController;
+    const ignoreCancellation = (error: unknown) => {
+      if (!signal.aborted) throw error;
+    };
+
+    runner.compute(input, { signal }).then((base) => update((run) => ({ ...run, base })), ignoreCancellation);
+
+    if (weatherEnabled)
+      void fetchCloudForecast(input.latitude, input.longitude, input.date, { signal }).then((weather) => {
+        const usable = weather.status === "ok" && weather.samples.length > 0;
         update((run) => ({
           ...run,
-          forecast: result.ok ? { status: "ready", plan: result.plan } : { status: "failed" },
-        })),
-      );
-    });
+          weather: weather.status,
+          forecast: usable ? { status: "computing" } : { status: "none" },
+        }));
+        if (!usable || cancelled) return;
+        runner.compute({ ...input, cloudCover: weather.samples }, { signal }).then(
+          (result) =>
+            update((run) => ({
+              ...run,
+              forecast: result.ok ? { status: "ready", plan: result.plan } : { status: "failed" },
+            })),
+          ignoreCancellation,
+        );
+      });
 
     return () => {
       cancelled = true;
       abortController.abort();
     };
-  }, [parsed, inputKey, requestKey]);
+  }, [parsed, inputKey, requestKey, weatherEnabled]);
 
   const retry = useCallback(() => {
     runnerRef.current?.reset();
-    setRetryCount((c) => c + 1);
+    setComputation((c) => ({ ...c, id: c.id + 1 }));
   }, []);
 
   if (!parsed.ok) {
@@ -179,6 +199,12 @@ export function usePlan(rawInput: unknown, label: string): UsePlanResult {
   }
 
   const current = runs.run?.requestKey === requestKey ? runs.run : null;
+  // The label can change without a new computation (10 becoming 10.0); a stale plan keeps the last one shown.
+  if (current && current.label !== label) {
+    setRuns((prev) =>
+      prev.run?.requestKey === requestKey ? { ...prev, run: { ...prev.run, label } } : prev,
+    );
+  }
   const stale = current ? runs.previous : (displayedRun(runs.run) ?? runs.previous);
   const plan = current && displayedPlan(current);
 
@@ -211,7 +237,7 @@ export function usePlan(rawInput: unknown, label: string): UsePlanResult {
     status: "computing",
     errors: [],
     isWorkerError: false,
-    weatherStatus: "loading",
+    weatherStatus: weatherEnabled ? "loading" : "disabled",
     stalePlan:
       stale && stale.inputKey !== inputKey
         ? { plan: stale.plan, label: stale.label, weatherStatus: stale.weatherStatus }

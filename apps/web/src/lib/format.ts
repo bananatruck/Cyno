@@ -49,6 +49,8 @@ export function reasonsBesideDarkAndMoon(reasons: readonly string[]): string[] {
 
 export function describeWeatherStatus(status: ForecastStatus): string {
   switch (status) {
+    case "disabled":
+      return "Cloud forecast is off. Cloud cover is unknown; rankings and the verdict ignore clouds.";
     case "loading":
       return "Checking the Open-Meteo cloud forecast.";
     case "ok":
