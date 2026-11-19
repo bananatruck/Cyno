@@ -8,15 +8,24 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  # One queue per branch: a manual run from another branch can never replace a pending main deployment.
-  group: pages-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
+  branch:
+    runs-on: ubuntu-latest
+    outputs:
+      is-main: ${{ steps.check.outputs.is-main }}
+    steps:
+      # GitHub expression comparisons ignore case; Bash's comparison preserves it.
+      - id: check
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            echo 'is-main=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'is-main=false' >> "$GITHUB_OUTPUT"
+          fi
   build:
-    # Manual runs deploy only from main, so a failing branch run cannot displace a pending main deployment.
-    if: github.ref == 'refs/heads/main'
+    needs: branch
+    if: needs.branch.outputs.is-main == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +42,10 @@ jobs:
           path: apps/web/dist
   deploy:
     needs: build
+    # Only the exact main branch reaches this queue, including for manual runs.
+    concurrency:
+      group: pages-main
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       pages: write
