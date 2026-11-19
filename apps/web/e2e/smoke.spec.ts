@@ -328,6 +328,73 @@ test("stops decorative animation under reduced motion so the page goes idle", as
   );
 });
 
+test("draws a visible border beam inside the selected ranked card", async ({ page }, testInfo) => {
+  await page.route(OPEN_METEO, (route) => route.abort());
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(LONG_BEACH);
+  const rankedSection = page.getByRole("region", { name: "Ranked observable objects" });
+  const cardButton = rankedSection.locator("button[aria-expanded]").first();
+  await cardButton.click();
+  await expect(cardButton).toHaveAttribute("aria-expanded", "true");
+  const card = cardButton.locator("xpath=..");
+  await expect(card.locator("[data-border-beam]")).toHaveCount(1);
+  await settle(page);
+
+  const beam = await card.evaluate((cardElement) => {
+    const beamElement = cardElement.querySelector("[data-border-beam]");
+    const ring = beamElement?.parentElement;
+    if (!(beamElement instanceof HTMLElement) || !ring) throw new Error("Expected the beam inside its ring");
+    const beamRect = beamElement.getBoundingClientRect();
+    const cardRect = cardElement.getBoundingClientRect();
+    const ringRect = ring.getBoundingClientRect();
+    const ringWidth = Number.parseFloat(getComputedStyle(ring).borderTopWidth);
+    let opacity = 1;
+    for (let node: Element | null = beamElement; node && node !== cardElement; node = node.parentElement) {
+      opacity *= Number(getComputedStyle(node).opacity);
+    }
+    const visible = {
+      left: Math.max(beamRect.left, cardRect.left),
+      right: Math.min(beamRect.right, cardRect.right),
+      top: Math.max(beamRect.top, cardRect.top),
+      bottom: Math.min(beamRect.bottom, cardRect.bottom),
+    };
+    const style = getComputedStyle(beamElement);
+    return {
+      width: beamRect.width,
+      height: beamRect.height,
+      opacity,
+      visibility: style.visibility,
+      display: style.display,
+      backgroundImage: style.backgroundImage,
+      ringWidth,
+      visibleWidth: Math.max(0, visible.right - visible.left),
+      visibleHeight: Math.max(0, visible.bottom - visible.top),
+      // The ring's mask shows the beam only on its border band, so the visible part must reach into it.
+      reachesBorderBand:
+        visible.left < ringRect.left + ringWidth ||
+        visible.right > ringRect.right - ringWidth ||
+        visible.top < ringRect.top + ringWidth ||
+        visible.bottom > ringRect.bottom - ringWidth,
+    };
+  });
+
+  expect(beam.width, "beam width").toBeGreaterThan(0);
+  expect(beam.height, "beam height").toBeGreaterThan(0);
+  expect(beam.opacity, "beam opacity through the card").toBeGreaterThan(0);
+  expect(beam.visibility).toBe("visible");
+  expect(beam.display).not.toBe("none");
+  expect(beam.backgroundImage).toContain("gradient");
+  expect(beam.ringWidth, "ring border width").toBeGreaterThan(0);
+  expect(beam.visibleWidth, "visible width inside the card's border box").toBeGreaterThan(0);
+  expect(beam.visibleHeight, "visible height inside the card's border box").toBeGreaterThan(0);
+  expect(beam.reachesBorderBand, "the visible part lies on the masked border band").toBe(true);
+
+  await card.screenshot({
+    path: testInfo.outputPath("selected-card-border-beam.png"),
+    animations: "disabled",
+  });
+});
+
 test("settle gives up after its deadline even with the browser clock fixed", async ({ page }) => {
   test.setTimeout(20_000);
   // beforeEach fixed Date.now(); performance.now() must still advance, or no deadline can fire.
