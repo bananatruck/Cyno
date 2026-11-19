@@ -327,3 +327,24 @@ test("stops decorative animation under reduced motion so the page goes idle", as
     1,
   );
 });
+
+test("settle gives up after its deadline even with the browser clock fixed", async ({ page }) => {
+  test.setTimeout(20_000);
+  // beforeEach fixed Date.now(); performance.now() must still advance, or no deadline can fire.
+  await page.setContent("<div id='busy' style='width:10px;height:10px'></div>");
+  const clocks = await page.evaluate(async () => {
+    const d0 = Date.now();
+    const p0 = performance.now();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return { date: Date.now() - d0, perf: performance.now() - p0 };
+  });
+  expect(clocks.date, "Date.now() is frozen by the fixed clock").toBe(0);
+  expect(clocks.perf, "performance.now() keeps running").toBeGreaterThan(250);
+  // A finite animation that outlasts the deadline keeps the page busy.
+  await page.evaluate(() => {
+    document.getElementById("busy")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 60_000 });
+  });
+  const started = Date.now();
+  await expect(page.evaluate(waitForPageSettle)).rejects.toThrow(/did not settle within 5000 ms/);
+  expect(Date.now() - started).toBeLessThan(10_000);
+});

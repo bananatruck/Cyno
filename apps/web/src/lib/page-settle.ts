@@ -35,7 +35,9 @@ export function buildSettleTimeoutMessage(deadlineMs = SETTLE_DEADLINE_MS): stri
 /** Must stay self-contained: Playwright `page.evaluate` only serializes this function body. */
 export async function waitForPageSettle(): Promise<void> {
   const deadlineMs = 5_000;
-  const deadline = Date.now() + deadlineMs;
+  // performance.now(), not Date.now(): the e2e tests fix the browser clock with page.clock.setFixedTime,
+  // which freezes Date.now() but leaves performance.now() and timers running.
+  const deadline = performance.now() + deadlineMs;
 
   const pageAnimationsAreIdle = () =>
     document
@@ -65,11 +67,11 @@ export async function waitForPageSettle(): Promise<void> {
         return `${pageLabelAnimation(animation)} on ${target?.tagName.toLowerCase()}.${target?.getAttribute("class") ?? ""}`;
       });
 
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     if (document.fonts.status === "loaded" && pageAnimationsAreIdle()) {
       return;
     }
-    const remaining = deadline - Date.now();
+    const remaining = deadline - performance.now();
     if (remaining <= 0) {
       break;
     }
