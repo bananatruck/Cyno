@@ -14,10 +14,12 @@ Sources (downloaded by this script, never typed by hand):
 Run: python3 -I scripts/build-catalog.py   (from packages/engine)
 The output file is generated; edit this script, not the JSON.
 """
+import argparse
 import csv
 import hashlib
 import io
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -40,6 +42,11 @@ PINNED_SHA256 = {
     "IAU-CSN": "84fac0c90f1b19abc491c2793469e0caa7b003ad1bc93a790ca41147010d0eb0",
     "Harris 2010": "b457a690adc422fb2e8e05a23e1de50b62d1d5ac10dce99963c956c1b17ca658",
 }
+PINNED_LOCAL_FILES = {
+    "IAU-CSN": "IAU-CSN.txt",
+    "Harris 2010": "mwgc.dat",
+}
+LOCAL_DIR_ENV = "CYNO_CATALOG_LOCAL_DIR"
 
 # OpenNGC type codes -> engine object kinds.
 TYPE_KIND = {
@@ -76,19 +83,30 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def fetch_pinned(name: str, url: str) -> str:
-    data = fetch(url)
+def verify_pinned_bytes(name: str, data: bytes) -> None:
     digest = sha256(data)
     expected = PINNED_SHA256.get(name)
     if expected and digest != expected:
         print(
             f"Refusing to build: {name} SHA-256 mismatch.\n"
             f"  expected (in script): {expected}\n"
-            f"  downloaded:           {digest}\n"
+            f"  provided:             {digest}\n"
             f"Update PINNED_SHA256 deliberately if the upstream file changed.",
             file=sys.stderr,
         )
         sys.exit(1)
+
+
+def fetch_pinned(name: str, url: str, local_dir: Path | None = None) -> str:
+    local_name = PINNED_LOCAL_FILES.get(name)
+    if local_dir and local_name:
+        path = local_dir / local_name
+        if path.is_file():
+            data = path.read_bytes()
+            verify_pinned_bytes(name, data)
+            return data.decode("utf-8")
+    data = fetch(url)
+    verify_pinned_bytes(name, data)
     return data.decode("utf-8")
 
 
@@ -216,11 +234,33 @@ def messier(ngc_text: str, add_text: str, vt: dict[str, float]) -> tuple[list[di
     return out, skipped
 
 
+def resolve_local_dir(cli_dir: str | None) -> Path | None:
+    raw = cli_dir or os.environ.get(LOCAL_DIR_ENV)
+    if not raw:
+        return None
+    path = Path(raw).expanduser().resolve()
+    if not path.is_dir():
+        print(f"Refusing to build: local catalog dir is not a directory: {path}", file=sys.stderr)
+        sys.exit(1)
+    return path
+
+
 def main() -> int:
-    s = stars(fetch_pinned("IAU-CSN", IAU_URL))
+    parser = argparse.ArgumentParser(description="Build src/data/catalog.json from published catalogs.")
+    parser.add_argument(
+        "--local-dir",
+        metavar="DIR",
+        help="Directory with digest-verified copies of pinned upstream files "
+        f"({', '.join(PINNED_LOCAL_FILES.values())}). "
+        f"Defaults to {LOCAL_DIR_ENV} when --local-dir is omitted.",
+    )
+    args = parser.parse_args()
+    local_dir = resolve_local_dir(args.local_dir)
+
+    s = stars(fetch_pinned("IAU-CSN", IAU_URL, local_dir))
     ngc = fetch(NGC_URL).decode("utf-8")
     add = fetch(ADD_URL).decode("utf-8")
-    m, skipped = messier(ngc, add, harris_vt(fetch_pinned("Harris 2010", HARRIS_URL)))
+    m, skipped = messier(ngc, add, harris_vt(fetch_pinned("Harris 2010", HARRIS_URL, local_dir)))
     doc = {
         "_generated": "by scripts/build-catalog.py; do not edit by hand",
         "sources": {
