@@ -38,6 +38,7 @@ test("weather opt-out persists and leaves the full astronomy plan usable without
     .getByRole("group", { name: "Equipment", exact: true })
     .getByRole("button", { name: "Binoculars", exact: true })
     .click();
+  await expect(page.getByRole("status", { name: "Updating night plan" })).toHaveCount(0);
   const ranked = page.getByRole("region", { name: "Ranked observable objects" });
   const firstCard = ranked.locator("button[aria-expanded]").first();
   await firstCard.click();
