@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Equipment, NightPlan, SkyQuality } from "@cyno/engine";
 import { NightTimeline, SkyChart } from "@/components/sky";
 import { ControlsBar } from "@/components/ControlsBar";
@@ -54,14 +54,18 @@ export default function App() {
   const [placeName, setPlaceName] = useState(initial.placeName);
   const [redMode, setRedMode] = useState<boolean>(() => readInitialRedMode());
   const [weatherEnabled, setWeatherEnabled] = useState(readInitialWeatherEnabled);
+  const [weatherStorageWarning, setWeatherStorageWarning] = useState(false);
 
-  useEffect(() => {
+  const setWeatherEnabledAndPersist = useCallback((enabled: boolean) => {
+    setWeatherEnabled(enabled);
     try {
-      window.localStorage.setItem(WEATHER_STORAGE_KEY, weatherEnabled ? "1" : "0");
+      window.localStorage.setItem(WEATHER_STORAGE_KEY, enabled ? "1" : "0");
+      setWeatherStorageWarning(false);
     } catch {
       // The setting still applies to this page when storage is unavailable.
+      setWeatherStorageWarning(true);
     }
-  }, [weatherEnabled]);
+  }, []);
 
   const [selection, setSelection] = useState<{
     planKey: string | null;
@@ -319,11 +323,19 @@ export default function App() {
           <input
             type="checkbox"
             checked={weatherEnabled}
-            onChange={(event) => setWeatherEnabled(event.target.checked)}
-            aria-describedby="weather-privacy-note"
+            onChange={(event) => setWeatherEnabledAndPersist(event.target.checked)}
+            aria-describedby={
+              weatherStorageWarning ? "weather-storage-warning weather-privacy-note" : "weather-privacy-note"
+            }
           />
           Use Open-Meteo cloud forecast
         </label>
+        {weatherStorageWarning ? (
+          <p id="weather-storage-warning" role="alert" className="mt-0 mb-2 text-ember">
+            Your forecast choice could not be saved in this browser. After reload, the forecast may turn on
+            again and send coordinates to Open-Meteo.
+          </p>
+        ) : null}
         <p id="weather-privacy-note" className="mt-0 mb-3">
           When enabled, your coordinates are sent to Open-Meteo. Turn this off to keep coordinates in your
           browser for planning. Without a forecast, cloud cover is unknown; rankings and the verdict ignore
