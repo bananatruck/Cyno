@@ -9,7 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  # One queue per branch: a manual run from another branch can never replace a pending main deployment.
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
