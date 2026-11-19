@@ -27,35 +27,47 @@ class Ngc2000Fallback(unittest.TestCase):
         self.check(b"Service unavailable, try again later\n")
 
     def test_expected_row_returns_the_magnitude(self):
+        original_fetch = build.fetch
         build.fetch = lambda url: b"name    |app_mag|app_mag_flag\nNGC 2168|    5.1|null\n"
-        self.assertEqual(build.ngc2000_vmag("NGC2168", 92.2711, 24.3386), 5.1)
+        try:
+            self.assertEqual(build.ngc2000_vmag("NGC2168", 92.2711, 24.3386), 5.1)
+        finally:
+            build.fetch = original_fetch
 
 
 class LocalPinnedSources(unittest.TestCase):
+    def setUp(self):
+        self.pinned_digests = build.PINNED_SHA256.copy()
+        self.fetch = build.fetch
+
+    def tearDown(self):
+        self.assertEqual(build.PINNED_SHA256, self.pinned_digests)
+        self.assertIs(build.fetch, self.fetch)
+
     def test_local_digest_verified_file_is_used(self):
         body = b"# pinned fixture\n"
         digest = build.sha256(body)
         name = "IAU-CSN"
-        original = build.PINNED_SHA256[name]
+        original_digest = build.PINNED_SHA256[name]
+        original_fetch = build.fetch
         build.PINNED_SHA256[name] = digest
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / build.PINNED_LOCAL_FILES[name]
-            path.write_bytes(body)
-            called = []
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / build.PINNED_LOCAL_FILES[name]
+                path.write_bytes(body)
+                called = []
 
-            def fail_fetch(url: str) -> bytes:
-                called.append(url)
-                raise AssertionError("fetch should not run when a verified local file exists")
+                def fail_fetch(url: str) -> bytes:
+                    called.append(url)
+                    raise AssertionError("fetch should not run when a verified local file exists")
 
-            original = build.fetch
-            build.fetch = fail_fetch
-            try:
+                build.fetch = fail_fetch
                 text = build.fetch_pinned(name, build.IAU_URL, Path(tmp))
-            finally:
-                build.fetch = original
-                build.PINNED_SHA256[name] = original
-            self.assertEqual(text, body.decode("utf-8"))
-            self.assertEqual(called, [])
+                self.assertEqual(text, body.decode("utf-8"))
+                self.assertEqual(called, [])
+        finally:
+            build.fetch = original_fetch
+            build.PINNED_SHA256[name] = original_digest
 
     def test_local_file_with_wrong_digest_exits(self):
         with tempfile.TemporaryDirectory() as tmp:
