@@ -187,4 +187,35 @@ describe("NightTimeline", () => {
     fireEvent.keyDown(slider, { key: "End" });
     expect(onTimeChange).toHaveBeenCalledWith(polarDay.window.end);
   });
+  it("stays navigable when no sample lies between sunset and sunrise", () => {
+    // A plan step longer than the night leaves sunset and sunrise between two samples.
+    const before = samples[3]!;
+    const after = samples[4]!;
+    const minutesAfter = (sample: { time: string }, minutes: number) =>
+      new Date(Date.parse(sample.time) + minutes * 60_000).toISOString();
+    const shortNight = {
+      ...night,
+      events: night.events.map((event) =>
+        event.kind === "sunset"
+          ? { ...event, time: minutesAfter(before, 2) }
+          : event.kind === "sunrise"
+            ? { ...event, time: minutesAfter(before, 6) }
+            : event,
+      ),
+    };
+    const onTimeChange = vi.fn();
+    render(
+      <NightTimeline plan={shortNight} time={before.time} selectedId={null} onTimeChange={onTimeChange} />,
+    );
+    const slider = screen.getByRole("slider");
+    expect(Number(slider.getAttribute("aria-valuemin"))).toBeLessThan(
+      Number(slider.getAttribute("aria-valuemax")),
+    );
+    expect(slider.getAttribute("aria-valuenow")).toBe(String(Date.parse(before.time)));
+
+    expect(fireEvent.keyDown(slider, { key: "ArrowRight" })).toBe(false);
+    expect(onTimeChange).toHaveBeenLastCalledWith(after.time);
+    fireEvent.keyDown(slider, { key: "Home" });
+    expect(onTimeChange).toHaveBeenLastCalledWith(shortNight.timeline[0]!.time);
+  });
 });
