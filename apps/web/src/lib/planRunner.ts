@@ -5,18 +5,30 @@ import type { WorkerRequest, WorkerResponse } from "./plan.worker";
 export type ComputeResult =
   { ok: true; plan: NightPlan } | { ok: false; errors: InputError[]; isWorkerError: boolean };
 
-interface PendingRequest {
+export interface ComputeOptions {
+  /** Aborting drops the request: it is not replayed, and no main-thread work starts for it. */
+  signal?: AbortSignal;
+}
+
+interface Request {
   input: PlanInput;
-  worker: Worker;
+  signal: AbortSignal | undefined;
   resolve: (result: ComputeResult) => void;
+}
+
+interface PendingRequest {
+  request: Request;
+  worker: Worker;
 }
 
 /** A worker that fails, then a fresh one that fails too, means workers do not work here. */
 const MAX_WORKER_FAILURES = 2;
 
-async function computeOnMainThread(input: PlanInput): Promise<ComputeResult> {
+/** Null when the request was cancelled while the engine loaded. */
+async function computeOnMainThread(input: PlanInput, signal?: AbortSignal): Promise<ComputeResult | null> {
   try {
     const { planNight } = await import("@cyno/engine");
+    if (signal?.aborted) return null;
     return { ok: true, plan: planNight(input) };
   } catch (err) {
     if (err instanceof PlanInputError) return { ok: false, errors: err.errors, isWorkerError: false };
@@ -37,8 +49,28 @@ export class PlanRunner {
   private nextId = 0;
   private readonly pending = new Map<number, PendingRequest>();
 
-  compute(input: PlanInput): Promise<ComputeResult> {
-    return new Promise((resolve) => this.dispatch(input, resolve));
+  /** Rejects with the signal's reason once the signal aborts. */
+  compute(input: PlanInput, { signal }: ComputeOptions = {}): Promise<ComputeResult> {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      const onAbort = () => {
+        this.forget(request);
+        reject(signal?.reason);
+      };
+      const request: Request = {
+        input,
+        signal,
+        resolve: (result) => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve(result);
+        },
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      this.dispatch(request);
+    });
   }
 
   /** Forgets earlier worker failures, so the next request tries a worker again. */
@@ -53,21 +85,34 @@ export class PlanRunner {
     this.pending.clear();
   }
 
-  private dispatch(input: PlanInput, resolve: (result: ComputeResult) => void): void {
+  private forget(request: Request): void {
+    for (const [id, pending] of this.pending) {
+      if (pending.request === request) this.pending.delete(id);
+    }
+  }
+
+  private dispatch(request: Request): void {
+    if (request.signal?.aborted) return;
     const worker = this.ensureWorker();
     if (!worker) {
-      void computeOnMainThread(input).then(resolve);
+      this.runOnMainThread(request);
       return;
     }
     const id = ++this.nextId;
-    this.pending.set(id, { input, worker, resolve });
-    const message: WorkerRequest = { id, input };
+    this.pending.set(id, { request, worker });
+    const message: WorkerRequest = { id, input: request.input };
     try {
       worker.postMessage(message);
     } catch {
       this.pending.delete(id);
-      void computeOnMainThread(input).then(resolve);
+      this.runOnMainThread(request);
     }
+  }
+
+  private runOnMainThread(request: Request): void {
+    void computeOnMainThread(request.input, request.signal).then((result) => {
+      if (result) request.resolve(result);
+    });
   }
 
   private ensureWorker(): Worker | null {
@@ -90,11 +135,11 @@ export class PlanRunner {
   }
 
   private handleMessage(msg: WorkerResponse): void {
-    const request = this.pending.get(msg.id);
-    if (!request) return;
+    const pending = this.pending.get(msg.id);
+    if (!pending) return;
     this.pending.delete(msg.id);
     this.failures = 0;
-    request.resolve(
+    pending.request.resolve(
       msg.ok
         ? { ok: true, plan: msg.plan }
         : { ok: false, errors: msg.errors, isWorkerError: Boolean(msg.isWorkerError) },
@@ -107,10 +152,10 @@ export class PlanRunner {
       this.worker = null;
       this.failures += 1;
     }
-    const orphaned = [...this.pending].filter(([, request]) => request.worker === worker);
-    for (const [id, request] of orphaned) {
+    const orphaned = [...this.pending].filter(([, pending]) => pending.worker === worker);
+    for (const [id, pending] of orphaned) {
       this.pending.delete(id);
-      this.dispatch(request.input, request.resolve);
+      this.dispatch(pending.request);
     }
   }
 }
