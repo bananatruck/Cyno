@@ -174,26 +174,23 @@ describe("ControlsBar", () => {
     });
 
     it.each([
-      [2, "unavailable"],
-      [3, "timeout"],
-    ])("does not claim permission was denied for error code %d (%s)", (code) => {
+      [1, "PERMISSION_DENIED", "Location access was denied. Choose a preset or enter coordinates manually."],
+      [
+        2,
+        "POSITION_UNAVAILABLE",
+        "Your device could not determine its location. Choose a preset or enter coordinates manually.",
+      ],
+      [
+        3,
+        "TIMEOUT",
+        "Your location could not be found in time. Choose a preset or enter coordinates manually.",
+      ],
+    ])("explains error code %d (%s) with its own message", (code, _name, message) => {
       const requests = stubGeolocation();
       render(<ControlsHarness />);
       fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
       act(() => requests[0]!.error(positionError(code)));
-      const status = screen.getByRole("status").textContent ?? "";
-      expect(status).not.toMatch(/denied/i);
-      expect(status).toContain("Choose a preset or enter coordinates manually.");
-    });
-
-    it("says permission was denied only for PERMISSION_DENIED", () => {
-      const requests = stubGeolocation();
-      render(<ControlsHarness />);
-      fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
-      act(() => requests[0]!.error(positionError(1)));
-      expect(screen.getByRole("status").textContent).toBe(
-        "Location access was denied. Choose a preset or enter coordinates manually.",
-      );
+      expect(screen.getByRole("status").textContent).toBe(message);
     });
   });
 

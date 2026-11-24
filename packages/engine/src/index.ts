@@ -2,7 +2,16 @@ import { Body, Illumination, MakeTime, Observer, Rotation_EQJ_HOR } from "astron
 import type { HiddenObject, NightPlan, PlanInput, RankedObject } from "./types";
 import { PlanInputError, resolveInput } from "./input";
 import { bodies, catalog, bodyPosition } from "./positions";
-import { clockFormatter, cloudAtParsed, HOUR, localNoonExists, nightWindow, parseCloudCover } from "./time";
+import {
+  clockFormatter,
+  cloudAtParsed,
+  HOUR,
+  localCalendarDateExists,
+  localNoonExists,
+  nightWindow,
+  nightWindowEndValid,
+  parseCloudCover,
+} from "./time";
 import { darkness, moonInfo, nightDarkness, skyEvents } from "./sky";
 import { limitingMagnitude } from "./brightness";
 import { evaluateTarget } from "./evaluate";
@@ -13,8 +22,21 @@ export { catalog } from "./positions";
 
 export function planNight(input: PlanInput): NightPlan {
   const resolved = resolveInput(input);
-  if (!localNoonExists(resolved.date, resolved.timeZone)) {
+  if (!localCalendarDateExists(resolved.date, resolved.timeZone)) {
     throw new PlanInputError([{ field: "date", message: "That date does not exist in this time zone." }]);
+  }
+  if (!localNoonExists(resolved.date, resolved.timeZone)) {
+    throw new PlanInputError([
+      { field: "date", message: "Local noon does not exist on the selected date in this time zone." },
+    ]);
+  }
+  if (!nightWindowEndValid(resolved.date, resolved.timeZone)) {
+    throw new PlanInputError([
+      {
+        field: "date",
+        message: "The next calendar day is missing or has no local noon in this time zone.",
+      },
+    ]);
   }
   const parsedCloud = parseCloudCover(resolved.cloudCover);
   const observer = new Observer(resolved.latitude, resolved.longitude, resolved.elevationMeters);
@@ -97,7 +119,7 @@ export function planNight(input: PlanInput): NightPlan {
   objects.forEach((o, i) => {
     o.rank = i + 1;
   });
-  const nightVerdict = verdict(resolved, condition, darkWindow, moon, clock, lowestSunAltDeg, parsedCloud);
+  const nightVerdict = verdict(condition, darkWindow, moon, clock, lowestSunAltDeg, parsedCloud);
   // Scoring conditions alone cannot recommend a night with no observable targets. When the verdict is
   // already no-go (no darkness, or clouds), its own reasons explain the empty list.
   if (objects.length === 0 && nightVerdict.label !== "no-go") {

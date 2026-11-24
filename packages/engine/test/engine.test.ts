@@ -296,6 +296,13 @@ it("uses local noon across daylight saving changes", () => {
     const w = nightWindow(nightDate, input.timeZone);
     expect(Date.parse(w.start)).toBe(start);
     expect(Date.parse(w.end)).toBe(end);
+    if (nightDate === "2026-03-07") {
+      expect(w.start).toBe("2026-03-07T20:00:00.000Z");
+      expect(w.end).toBe("2026-03-08T19:00:00.000Z");
+    } else {
+      expect(w.start).toBe("2026-10-31T19:00:00.000Z");
+      expect(w.end).toBe("2026-11-01T20:00:00.000Z");
+    }
   }
 });
 it("is deterministic, does not mutate input and uses plain local text", () => {

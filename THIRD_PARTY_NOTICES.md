@@ -32,13 +32,37 @@ Whether keeping their adapted source in a public repository is compatible with t
 
 ### Magic UI: `number-ticker.tsx`, `border-beam.tsx`
 
-Source: https://magicui.design, MIT License, Copyright (c) Magic UI.
-The MIT permission notice is the same as Cyno's `LICENSE`.
+Source: https://magicui.design (repository https://github.com/magicuidesign/magicui).
 
-### 21st.dev: `segmented-control.tsx`, `place-combobox.tsx`
+> MIT License
+>
+> Copyright (c) Magic UI
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Sources: https://21st.dev/@halaska-studio/components/segmented-control (MIT, by halaska-studio) and https://21st.dev/@hero_ui/components/heroui-combo-box (MIT, by Hero UI), as listed on those pages.
-The MIT permission notice is the same as Cyno's `LICENSE`.
+### 21st.dev: `segmented-control.tsx`
+
+Source: https://21st.dev/@halaska-studio/components/segmented-control, from https://github.com/Halaska-Studio/ui.
+
+> MIT License
+>
+> Copyright (c) 2026 Halaska Studio
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+### 21st.dev: `place-combobox.tsx`
+
+Source: https://21st.dev/@hero_ui/components/heroui-combo-box, listed there as MIT by Hero UI.
+The HeroUI project it comes from (https://github.com/heroui-inc/heroui) is licensed under the Apache License 2.0, so this file is also offered under that licence; its full text is in [`licenses/HeroUI-Apache-2.0.txt`](licenses/HeroUI-Apache-2.0.txt).
+The HeroUI repository has no NOTICE file.
 
 ## Data in `packages/engine/src/data/catalog.json`
 

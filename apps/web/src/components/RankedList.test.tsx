@@ -77,6 +77,40 @@ describe("RankedList", () => {
     expect(stars.getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("switches back to All when the selected object is activated again from outside the filter", () => {
+    const planet = samplePlan.objects.find((object) => object.kind === "moon" || object.kind === "planet")!;
+    const onSelect = vi.fn();
+    render(<RankedList plan={samplePlan} selectedId={planet.id} onSelect={onSelect} />);
+    const chips = screen.getByRole("group", { name: "Filter objects by category" });
+    const all = within(chips).getByRole("button", { name: /^All/ });
+    const stars = within(chips).getByRole("button", { name: /^Stars/ });
+    const reasoning = () => screen.queryByRole("region", { name: `${planet.name} visibility reasoning` });
+
+    fireEvent.click(stars);
+    expect(reasoning()).toBeNull();
+
+    const highlights = screen.getByRole("group", { name: "Tonight's highlights" });
+    fireEvent.click(within(highlights).getByRole("button", { name: /^Moon or planet/ }));
+    expect(onSelect).toHaveBeenCalledWith(planet.id);
+    expect(all.getAttribute("aria-pressed")).toBe("true");
+    expect(reasoning()).toBeTruthy();
+  });
+
+  it("keeps a deliberate filter when the activated object belongs to it", () => {
+    const star = samplePlan.objects.find((object) => object.kind === "star")!;
+    render(<RankedList plan={samplePlan} selectedId={star.id} onSelect={() => {}} />);
+    const chips = screen.getByRole("group", { name: "Filter objects by category" });
+    const stars = within(chips).getByRole("button", { name: /^Stars/ });
+    fireEvent.click(stars);
+
+    const highlights = screen.getByRole("group", { name: "Tonight's highlights" });
+    const highlightedStar = within(highlights)
+      .getAllByRole("button")
+      .find((button) => button.textContent?.startsWith("Star"));
+    fireEvent.click(highlightedStar!);
+    expect(stars.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("shows the visible window and Moon distance as separate lines, without middle dots", () => {
     const firstObject = samplePlan.objects.find((object) => object.moonSeparationDeg !== null)!;
     const zone = samplePlan.input.timeZone;

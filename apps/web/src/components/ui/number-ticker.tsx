@@ -1,7 +1,8 @@
 // Source: https://magicui.design/r/number-ticker.json (https://magicui.design/docs/components/number-ticker)
 // License: MIT
-import { useCallback, useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
+import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import { useMotionValue, useSpring } from "motion/react";
+import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 
 export interface NumberTickerProps extends ComponentPropsWithoutRef<"span"> {
@@ -22,15 +23,13 @@ export function NumberTicker({
   ...props
 }: NumberTickerProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const initiallyReduced =
-    typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-  const initialValue = initiallyReduced ? value : direction === "down" ? value : startValue;
+  const reducedMotion = usePrefersReducedMotion();
+  const initialValue = reducedMotion || direction === "down" ? value : startValue;
   const motionValue = useMotionValue(initialValue);
   const springValue = useSpring(motionValue, {
     damping: 38,
     stiffness: 280,
   });
-  const [reducedMotion, setReducedMotion] = useState(initiallyReduced);
   const [isInView, setIsInView] = useState(() => typeof IntersectionObserver === "undefined");
 
   useEffect(() => {
@@ -50,29 +49,10 @@ export function NumberTicker({
     return () => observer.disconnect();
   }, []);
 
-  const formatNumber = useCallback(
-    (n: number) =>
-      Intl.NumberFormat("en-US", {
-        minimumFractionDigits: decimalPlaces,
-        maximumFractionDigits: decimalPlaces,
-      }).format(Number(n.toFixed(decimalPlaces))),
-    [decimalPlaces],
-  );
+  // The numeric sample, formatted at render: a spring that jumps to its current value emits no change.
+  const [shownValue, setShownValue] = useState(initialValue);
 
-  const [displayedValue, setDisplayedValue] = useState(() => formatNumber(initialValue));
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-
-  useEffect(
-    () => springValue.on("change", (latest) => setDisplayedValue(formatNumber(latest))),
-    [springValue, formatNumber],
-  );
+  useEffect(() => springValue.on("change", setShownValue), [springValue]);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -100,11 +80,16 @@ export function NumberTicker({
         clearTimeout(timer);
       }
     };
-  }, [motionValue, springValue, isInView, delay, value, direction, startValue, reducedMotion, formatNumber]);
+  }, [motionValue, springValue, isInView, delay, value, direction, startValue, reducedMotion]);
+
+  const formatted = Intl.NumberFormat("en-US", {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
+  }).format(Number(shownValue.toFixed(decimalPlaces)));
 
   return (
     <span ref={ref} className={cn("inline-block tabular-nums text-starlight", className)} {...props}>
-      {displayedValue}
+      {formatted}
     </span>
   );
 }

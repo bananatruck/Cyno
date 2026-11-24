@@ -90,19 +90,41 @@ export function localNoonExists(date: string, timeZone: string): boolean {
   }
 }
 
+/** True when some local civil time maps to `date` in `timeZone`. */
+export function localCalendarDateExists(date: string, timeZone: string): boolean {
+  const parts = parseYmd(date);
+  if (!parts) return false;
+  const anchor = utcNoonFromYmd(parts.year, parts.month, parts.day);
+  for (let t = anchor - DAY; t <= anchor + DAY; t += HOUR) {
+    if (formatLocalDateAtNoon(t, timeZone) === date) return true;
+  }
+  return false;
+}
+
 export function nightWindow(date: string, zone: string) {
   const next = addCalendarDays(date, 1);
+  const startMs = localNoon(date, zone);
+  const endMs = localNoon(next, zone);
   return {
-    start: new Date(localNoon(date, zone)).toISOString(),
-    end: new Date(localNoon(next, zone)).toISOString(),
+    start: new Date(startMs).toISOString(),
+    end: new Date(endMs).toISOString(),
   };
+}
+
+export function nightWindowEndValid(date: string, timeZone: string): boolean {
+  const next = addCalendarDays(date, 1);
+  if (!localCalendarDateExists(next, timeZone)) return false;
+  return localNoonExists(next, timeZone);
 }
 
 export type ParsedCloudCover = { times: number[]; percents: number[] };
 
 export function parseCloudCover(samples: CloudSample[] | null): ParsedCloudCover | null {
   if (!samples?.length) return null;
-  return { times: samples.map((s) => Date.parse(s.time)), percents: samples.map((s) => s.percent) };
+  const rows = samples
+    .map((s) => ({ time: Date.parse(s.time), percent: s.percent }))
+    .sort((a, b) => a.time - b.time);
+  return { times: rows.map((r) => r.time), percents: rows.map((r) => r.percent) };
 }
 
 function latestCloudIndex(time: number, times: number[]): number {

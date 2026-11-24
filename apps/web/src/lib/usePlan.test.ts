@@ -24,6 +24,43 @@ const NIGHT_CLOUDS: CloudSample[] = Array.from({ length: 30 }, (_, hour) => ({
 
 const forecast = vi.mocked(fetchCloudForecast);
 
+describe("weather privacy", () => {
+  it("computes and updates plans without requesting weather when disabled", async () => {
+    vi.stubGlobal("Worker", FakeWorker);
+    const { result, rerender } = renderHook(({ input }) => usePlan(input, "Place", false), {
+      initialProps: { input: LONG_BEACH },
+    });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.weatherStatus).toBe("disabled");
+    expect(result.current.plan?.timeline.every((sample) => sample.cloudPercent === null)).toBe(true);
+    rerender({ input: TOKYO });
+    await waitFor(() => expect(result.current.plan?.input.latitude).toBe(TOKYO.latitude));
+    expect(forecast).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending forecast on opt-out, ignores its late response, and can opt back in", async () => {
+    vi.stubGlobal("Worker", FakeWorker);
+    const pending = deferred<WeatherResult>();
+    forecast.mockReturnValueOnce(pending.promise);
+    const { result, rerender } = renderHook((enabled) => usePlan(LONG_BEACH, "Place", enabled), {
+      initialProps: true,
+    });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    const signal = forecast.mock.calls[0]?.[3]?.signal;
+    rerender(false);
+    expect(signal?.aborted).toBe(true);
+    await act(async () => pending.resolve({ samples: NIGHT_CLOUDS, status: "ok" }));
+    await waitFor(() => expect(result.current.weatherStatus).toBe("disabled"));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.plan?.timeline.every((sample) => sample.cloudPercent === null)).toBe(true);
+    expect(forecast).toHaveBeenCalledTimes(1);
+    forecast.mockResolvedValue({ samples: NIGHT_CLOUDS, status: "ok" });
+    rerender(true);
+    await waitFor(() => expect(result.current.weatherStatus).toBe("ok"));
+    expect(forecast).toHaveBeenCalledTimes(2);
+  });
+});
+
 /** Stands in for the module worker; requests wait until flush() unless auto is set. */
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -47,6 +84,22 @@ class FakeWorker {
   postMessage(request: WorkerRequest) {
     this.queue.push(request);
     if (this.behaviour === "auto") setTimeout(() => this.flush());
+  }
+
+  /** Answers the oldest queued requests with a worker error. */
+  fail(count = this.queue.length) {
+    for (const { id } of this.queue.splice(0, count)) {
+      this.onmessage?.(
+        new MessageEvent("message", {
+          data: {
+            id,
+            ok: false,
+            errors: [{ field: "input", message: "Worker crashed" }],
+            isWorkerError: true,
+          },
+        }),
+      );
+    }
   }
 
   flush(count = this.queue.length) {
@@ -237,5 +290,91 @@ describe("usePlan with a worker", () => {
     expect(result.current.plan?.input.latitude).toBe(35.68);
     expect(result.current.stalePlan).toBeNull();
     expect(result.current.weatherStatus).toBe("unavailable");
+  });
+
+  it("does not show the cancelled forecast of a superseded plan as loading", async () => {
+    FakeWorker.behaviour = "manual";
+    forecast.mockImplementation(async (latitude) =>
+      latitude === LONG_BEACH.latitude ? { samples: NIGHT_CLOUDS, status: "ok" } : new Promise(() => {}),
+    );
+    const { result, rerender } = renderHook(({ input, label }) => usePlan(input, label), {
+      initialProps: { input: LONG_BEACH, label: "Long Beach, CA" },
+    });
+    const worker = FakeWorker.instances[0]!;
+    await waitFor(() => expect(worker.queue).toHaveLength(2));
+    await act(async () => worker.flush(1));
+    expect(result.current.weatherStatus).toBe("loading");
+
+    rerender({ input: TOKYO, label: "Tokyo" });
+    expect(result.current.status).toBe("computing");
+    expect(result.current.stalePlan?.label).toBe("Long Beach, CA");
+    expect(result.current.stalePlan?.weatherStatus).toBe("unavailable");
+  });
+
+  it("does not show an earlier failure for the same input while it computes again", async () => {
+    FakeWorker.behaviour = "manual";
+    const { result, rerender } = renderHook(({ input, label }) => usePlan(input, label), {
+      initialProps: { input: LONG_BEACH, label: "Long Beach, CA" },
+    });
+    const worker = FakeWorker.instances[0]!;
+    await waitFor(() => expect(worker.queue).toHaveLength(1));
+    await act(async () => worker.fail());
+    expect(result.current.status).toBe("error");
+    expect(result.current.isWorkerError).toBe(true);
+
+    rerender({ input: TOKYO, label: "Tokyo" });
+    rerender({ input: { ...LONG_BEACH }, label: "Long Beach, CA" });
+    expect(result.current.status).toBe("computing");
+    expect(result.current.isWorkerError).toBe(false);
+
+    await waitFor(() => expect(worker.queue).toHaveLength(2));
+    await act(async () => worker.flush());
+    expect(result.current.status).toBe("ready");
+    expect(result.current.plan?.input.latitude).toBe(33.77);
+  });
+
+  it("keeps the last label shown with a plan when that plan becomes stale", async () => {
+    FakeWorker.behaviour = "manual";
+    const { result, rerender } = renderHook(({ input, label }) => usePlan(input, label), {
+      initialProps: { input: LONG_BEACH, label: "Home" },
+    });
+    const worker = FakeWorker.instances[0]!;
+    await waitFor(() => expect(worker.queue).toHaveLength(1));
+    await act(async () => worker.flush());
+    expect(result.current.status).toBe("ready");
+
+    rerender({ input: { ...LONG_BEACH }, label: "33.77°, -118.19°" });
+    expect(worker.queue).toHaveLength(0);
+    rerender({ input: TOKYO, label: "Tokyo" });
+    expect(result.current.stalePlan?.label).toBe("33.77°, -118.19°");
+  });
+
+  it("ignores a forecast that arrives after the location changed", async () => {
+    FakeWorker.behaviour = "manual";
+    const longBeachForecast = deferred<WeatherResult>();
+    forecast.mockImplementation(async (latitude) =>
+      latitude === LONG_BEACH.latitude ? longBeachForecast.promise : { samples: [], status: "offline" },
+    );
+    const { result, rerender } = renderHook(({ input, label }) => usePlan(input, label), {
+      initialProps: { input: LONG_BEACH, label: "Long Beach, CA" },
+    });
+    const worker = FakeWorker.instances[0]!;
+    await waitFor(() => expect(worker.queue).toHaveLength(1));
+    await act(async () => worker.flush());
+
+    rerender({ input: TOKYO, label: "Tokyo" });
+    await waitFor(() => expect(worker.queue).toHaveLength(1));
+    await act(async () => worker.flush());
+    expect(result.current.status).toBe("ready");
+    expect(result.current.plan?.input.latitude).toBe(35.68);
+
+    await act(async () => {
+      longBeachForecast.resolve({ samples: NIGHT_CLOUDS, status: "ok" });
+      await longBeachForecast.promise;
+    });
+    expect(worker.queue).toHaveLength(0);
+    expect(result.current.status).toBe("ready");
+    expect(result.current.plan?.input.latitude).toBe(35.68);
+    expect(result.current.weatherStatus).toBe("offline");
   });
 });
