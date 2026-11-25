@@ -123,6 +123,23 @@ test("without a cloud forecast, lays out desktop and phone honestly and saves sc
   await page.screenshot({ path: screenshotPath("phone.png"), fullPage: true, animations: "disabled" });
 });
 
+test("fits the loading placeholder to a 320-pixel phone", async ({ page }) => {
+  await page.route(OPEN_METEO, (route) => route.abort());
+  // Hold the calculation worker back so the placeholder stays on screen while it is measured.
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/plan\.worker[^/]*\.js/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto(LONG_BEACH);
+  await expect(page.getByRole("status", { name: "Computing night plan" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  release();
+  expect(overflow, "page wider than the viewport while the plan computes").toBeLessThanOrEqual(0);
+});
+
 test("keeps the sky chart usable in a short desktop window and lets the page scroll", async ({ page }) => {
   await page.route(OPEN_METEO, (route) => route.abort());
   await page.setViewportSize({ width: 1280, height: 380 });

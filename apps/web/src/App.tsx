@@ -282,9 +282,9 @@ export default function App() {
             className="grid grid-cols-1 gap-5 lg:grid-cols-12"
           >
             <div className="h-[520px] animate-pulse rounded-2xl border border-moonsilver/15 bg-nautical/35 p-6 lg:col-span-7">
-              <div className="h-10 w-44 rounded-lg bg-civil/35" />
-              <div className="mt-3 h-4 w-72 rounded bg-civil/25" />
-              <div className="mx-auto mt-10 h-80 w-80 rounded-full border border-moonsilver/15 bg-abyss/40" />
+              <div className="h-10 w-44 max-w-full rounded-lg bg-civil/35" />
+              <div className="mt-3 h-4 w-72 max-w-full rounded bg-civil/25" />
+              <div className="mx-auto mt-10 aspect-square w-80 max-w-full rounded-full border border-moonsilver/15 bg-abyss/40" />
             </div>
             <div className="h-[520px] animate-pulse rounded-2xl border border-moonsilver/15 bg-nautical/35 p-6 lg:col-span-5">
               <div className="h-7 w-48 rounded bg-civil/35" />
