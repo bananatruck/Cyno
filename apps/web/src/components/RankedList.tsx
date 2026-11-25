@@ -374,11 +374,24 @@ export function RankedList({ plan, selectedId, onSelect }: RankedListProps) {
               />
             </div>
 
-            {filteredHidden.length === 0 ? (
-              <p className="m-0 text-[13px] text-moonsilver">
-                No hidden objects match &ldquo;{hiddenSearch}&rdquo;.
-              </p>
-            ) : (
+            {/* Always present, so a change to its text is announced: the result of a search, while the
+                list stays outside it. The match count is for screen readers; no matches is shown too. */}
+            <p
+              role="status"
+              aria-label="Not visible search results"
+              className="m-0 text-[13px] text-moonsilver"
+            >
+              {hiddenSearch.trim() === "" ? null : filteredHidden.length === 0 ? (
+                <>No hidden objects match &ldquo;{hiddenSearch}&rdquo;.</>
+              ) : (
+                <span className="sr-only">
+                  {filteredHidden.length} hidden{" "}
+                  {filteredHidden.length === 1 ? "object matches" : "objects match"} &ldquo;{hiddenSearch}
+                  &rdquo;.
+                </span>
+              )}
+            </p>
+            {filteredHidden.length === 0 ? null : (
               <ul
                 aria-label="Objects not visible tonight"
                 className="m-0 flex list-none flex-col gap-1.5 p-0 text-[12px]"

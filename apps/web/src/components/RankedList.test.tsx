@@ -262,6 +262,23 @@ describe("RankedList", () => {
     expect(within(hiddenList).queryByText(otherHidden.name)).toBeNull();
   });
 
+  it("announces the search result through a status region that exists before the search", () => {
+    render(<RankedList plan={samplePlan} selectedId={null} onSelect={() => {}} />);
+    // A live region must be in the page before its text changes, or screen readers miss the change.
+    const status = screen.getByRole("status", { name: "Not visible search results" });
+    expect(status.textContent).toBe("");
+
+    const searchInput = screen.getByRole("searchbox", { name: "Search not visible objects" });
+    fireEvent.change(searchInput, { target: { value: "zzz-no-such-object" } });
+    expect(screen.getByRole("status", { name: "Not visible search results" })).toBe(status);
+    expect(status.textContent).toBe("No hidden objects match \u201czzz-no-such-object\u201d.");
+
+    fireEvent.change(searchInput, { target: { value: samplePlan.hidden[0]!.name } });
+    expect(status.textContent).toMatch(/^\d+ hidden objects? match/);
+    // The results themselves stay outside the live region.
+    expect(within(status).queryByRole("list")).toBeNull();
+  });
+
   it("hides the kind label when it only repeats the object's name", () => {
     const moon = samplePlan.objects.find((object) => object.kind === "moon")!;
     const planet = samplePlan.objects.find((object) => object.kind === "planet")!;
