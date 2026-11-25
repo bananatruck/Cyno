@@ -95,6 +95,14 @@ describe("formatDarkAndMoonSummary", () => {
     );
   });
 
+  it("does not call a short real Moon-up interval zero", () => {
+    // At Long Beach on 2026-06-12 the Moon is up for about 2 minutes (0.039 h) of the dark window.
+    const short = planNight({ latitude: 33.77, longitude: -118.19, date: "2026-06-12" });
+    expect(short.moon.hoursUpInDarkWindow).toBeGreaterThan(0);
+    expect(short.moon.hoursUpInDarkWindow).toBeLessThan(0.05);
+    expect(formatDarkAndMoonSummary(short)).toMatch(/, up for less than 0\.1 dark hours\.$/);
+  });
+
   it("returns null without a dark window", () => {
     expect(formatDarkAndMoonSummary({ ...plan, darkWindow: null })).toBeNull();
   });

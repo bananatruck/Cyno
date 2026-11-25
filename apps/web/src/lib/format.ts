@@ -35,8 +35,13 @@ export function formatDarkAndMoonSummary(plan: NightPlan): string | null {
   const zone = plan.input.timeZone;
   const { phaseName, illumination, hoursUpInDarkWindow } = plan.moon;
   const moonName = phaseName.endsWith("Moon") ? phaseName : `${phaseName} Moon`;
-  const hoursUp = hoursUpInDarkWindow.toFixed(1);
-  const moonUp = hoursUp === "0.0" ? "not up during the dark hours" : `up for ${hoursUp} dark hours`;
+  // The unrounded time decides whether the Moon was up: two minutes up is not "not up".
+  const moonUp =
+    hoursUpInDarkWindow <= 0
+      ? "not up during the dark hours"
+      : hoursUpInDarkWindow < 0.05
+        ? "up for less than 0.1 dark hours"
+        : `up for ${hoursUpInDarkWindow.toFixed(1)} dark hours`;
   return `${formatDarkWindowSummaryLine(dark, zone)} ${moonName}, ${Math.round(illumination * 100)}% lit, ${moonUp}.`;
 }
 

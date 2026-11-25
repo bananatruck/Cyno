@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { planNight } from "../src/index";
 import { moonInfo } from "../src/sky";
 import { clockFormatter } from "../src/time";
@@ -144,4 +144,16 @@ it("keeps moon phase naming stable at the dark-window midpoint", () => {
   const observer = new Observer(input.latitude, input.longitude, 0);
   const fromMoonInfo = moonInfo(observer, start, end, plan.darkWindow);
   expect(fromMoonInfo.phaseName).toBe(plan.moon.phaseName);
+});
+
+describe("Moon-up wording", () => {
+  it("does not call a short real Moon-up interval 0.0 hours", () => {
+    // At Long Beach on 2026-06-12 the Moon is up for about 2 minutes (0.039 h) of the dark window.
+    const plan = planNight({ latitude: 33.77, longitude: -118.19, date: "2026-06-12" });
+    expect(plan.moon.hoursUpInDarkWindow).toBeGreaterThan(0);
+    expect(plan.moon.hoursUpInDarkWindow).toBeLessThan(0.05);
+    expect(plan.verdict.reasons).toContainEqual(
+      expect.stringMatching(/^The \d+% Moon is up for less than 0\.1 dark hours\.$/),
+    );
+  });
 });
