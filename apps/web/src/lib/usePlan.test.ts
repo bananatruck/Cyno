@@ -292,6 +292,24 @@ describe("usePlan with a worker", () => {
     expect(result.current.weatherStatus).toBe("unavailable");
   });
 
+  it("shows the forecast as off for a stale plan once the forecast is turned off", async () => {
+    FakeWorker.behaviour = "manual";
+    forecast.mockResolvedValue({ samples: NIGHT_CLOUDS, status: "ok" });
+    const { result, rerender } = renderHook(({ input, label, weather }) => usePlan(input, label, weather), {
+      initialProps: { input: LONG_BEACH, label: "Long Beach, CA", weather: true },
+    });
+    const worker = FakeWorker.instances[0]!;
+    await waitFor(() => expect(worker.queue).toHaveLength(2));
+    await act(async () => worker.flush());
+    await waitFor(() => expect(result.current.weatherStatus).toBe("ok"));
+
+    // A new date with the forecast now off: the old plan stays on screen while the new one computes.
+    rerender({ input: TOKYO, label: "Tokyo", weather: false });
+    expect(result.current.status).toBe("computing");
+    expect(result.current.stalePlan?.label).toBe("Long Beach, CA");
+    expect(result.current.stalePlan?.weatherStatus).toBe("disabled");
+  });
+
   it("does not show the cancelled forecast of a superseded plan as loading", async () => {
     FakeWorker.behaviour = "manual";
     forecast.mockImplementation(async (latitude) =>

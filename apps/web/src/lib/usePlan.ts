@@ -238,9 +238,14 @@ export function usePlan(rawInput: unknown, label: string, weatherEnabled = true)
     errors: [],
     isWorkerError: false,
     weatherStatus: weatherEnabled ? "loading" : "disabled",
+    // With the forecast now off, the stale plan's earlier forecast status no longer applies.
     stalePlan:
       stale && stale.inputKey !== inputKey
-        ? { plan: stale.plan, label: stale.label, weatherStatus: stale.weatherStatus }
+        ? {
+            plan: stale.plan,
+            label: stale.label,
+            weatherStatus: weatherEnabled ? stale.weatherStatus : "disabled",
+          }
         : null,
     retry,
   };
