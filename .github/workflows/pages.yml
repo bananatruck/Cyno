@@ -8,10 +8,11 @@ on:
 permissions:
   contents: read
 
-# One run per ref at a time, for the whole workflow, not only the deploy job: a run starts only after the
-# previous run for main has built and deployed, and a newer queued run replaces an older pending one. So an
-# older main run can never publish after a newer one. In-progress runs are not cancelled, so a deployment
-# is never cut off halfway.
+# One run per ref at a time, for the whole workflow: a run starts only after the previous one for that ref
+# has finished, and in-progress runs are not cancelled, so a deployment is never cut off halfway. GitHub
+# starts waiting runs in the order they began waiting, not in commit order, and does not guarantee that
+# order, so the group alone cannot stop an older commit from publishing after a newer one; the deploy job
+# checks the revision for that.
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: false
@@ -53,11 +54,31 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Publish only the commit main points at now. Runs for main go one at a time, so a run whose commit
+      # main has moved past skips here and the newer commit's own run publishes it. Guaranteed: an older
+      # commit never replaces a newer one on the site. Not guaranteed: that the newest commit is always
+      # published, for example when its run was cancelled while pending or failed; the next push does it.
+      # The automatic workflow token reads the ref; no secret is needed.
+      - id: revision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          if [[ "$head" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main is now at $head, not $GITHUB_SHA; not publishing this run's build"
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+          fi
       - id: deployment
+        if: steps.revision.outputs.current == 'true'
         uses: actions/deploy-pages@v4
