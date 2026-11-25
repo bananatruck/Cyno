@@ -14,6 +14,16 @@ interface Request {
   input: PlanInput;
   signal: AbortSignal | undefined;
   resolve: (result: ComputeResult) => void;
+  /** Settles the request with an error and drops its abort listener. */
+  reject: (error: unknown) => void;
+}
+
+/** A request was still pending when its runner was disposed or reset; its result will never come. */
+export class PlanRunnerDisposedError extends Error {
+  constructor() {
+    super("The plan runner was disposed before this plan was computed.");
+    this.name = "PlanRunnerDisposedError";
+  }
 }
 
 interface PendingRequest {
@@ -67,6 +77,10 @@ export class PlanRunner {
           signal?.removeEventListener("abort", onAbort);
           resolve(result);
         },
+        reject: (error) => {
+          signal?.removeEventListener("abort", onAbort);
+          reject(error);
+        },
       };
       signal?.addEventListener("abort", onAbort, { once: true });
       this.dispatch(request);
@@ -79,10 +93,16 @@ export class PlanRunner {
     this.failures = 0;
   }
 
+  /**
+   * Stops the worker and rejects every request still waiting for it with PlanRunnerDisposedError, so no
+   * promise is left pending; a request without a signal has no other way to settle.
+   */
   dispose(): void {
     this.worker?.terminate();
     this.worker = null;
+    const waiting = [...this.pending.values()];
     this.pending.clear();
+    for (const { request } of waiting) request.reject(new PlanRunnerDisposedError());
   }
 
   private forget(request: Request): void {

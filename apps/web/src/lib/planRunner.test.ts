@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { planNight } from "@cyno/engine";
-import { PlanRunner } from "./planRunner";
+import { PlanRunner, PlanRunnerDisposedError } from "./planRunner";
 
 vi.mock("@cyno/engine", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@cyno/engine")>();
@@ -32,6 +32,14 @@ class UncloneableWorker {
   terminate() {
     this.terminated = true;
   }
+}
+
+/** Accepts requests and never answers, like a worker still computing. */
+class SilentWorker {
+  onmessage: unknown = null;
+  onerror: unknown = null;
+  postMessage() {}
+  terminate() {}
 }
 
 /** Accepts requests, then fails to load its script, like a worker whose chunk cannot be fetched. */
@@ -112,4 +120,21 @@ describe("PlanRunner", () => {
     await runner.compute(TOKYO);
     expect(vi.mocked(planNight).mock.calls.map(([input]) => input.latitude)).toEqual([35.68]);
   });
+
+  it.each(["dispose", "reset"] as const)(
+    "settles pending requests on %s, with or without a signal",
+    async (method) => {
+      vi.stubGlobal("Worker", SilentWorker);
+      const runner = new PlanRunner();
+      const controller = new AbortController();
+      const unsignalled = runner.compute(LONG_BEACH);
+      const signalled = runner.compute(TOKYO, { signal: controller.signal });
+      runner[method]();
+      await expect(unsignalled).rejects.toBeInstanceOf(PlanRunnerDisposedError);
+      await expect(signalled).rejects.toBeInstanceOf(PlanRunnerDisposedError);
+      // The abort listener was removed: a later abort changes nothing.
+      controller.abort();
+      await expect(signalled).rejects.toBeInstanceOf(PlanRunnerDisposedError);
+    },
+  );
 });
