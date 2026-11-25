@@ -8,6 +8,14 @@ on:
 permissions:
   contents: read
 
+# One run per ref at a time, for the whole workflow, not only the deploy job: a run starts only after the
+# previous run for main has built and deployed, and a newer queued run replaces an older pending one. So an
+# older main run can never publish after a newer one. In-progress runs are not cancelled, so a deployment
+# is never cut off halfway.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   branch:
     runs-on: ubuntu-latest
@@ -41,11 +49,8 @@ jobs:
         with:
           path: apps/web/dist
   deploy:
+    # Only the exact main branch reaches this job, including for manual runs.
     needs: build
-    # Only the exact main branch reaches this queue, including for manual runs.
-    concurrency:
-      group: pages-main
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       pages: write
