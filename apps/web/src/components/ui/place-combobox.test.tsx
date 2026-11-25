@@ -69,6 +69,19 @@ describe("PlaceCombobox", () => {
     expect(Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView")).toEqual(before);
   });
 
+  it("scrolls the reset active option into view after the query changes", () => {
+    withScrollIntoView((scrollIntoView) => {
+      const { input } = renderCombobox();
+      const options = screen.getAllByRole("option");
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(scrollIntoView.mock.contexts.at(-1)).toBe(options.at(-1));
+      // A space keeps every preset but resets the active option to the first one.
+      fireEvent.change(input, { target: { value: " " } });
+      expect(input.getAttribute("aria-activedescendant")).toBe(options[0]?.id);
+      expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
+    });
+  });
+
   it("starts at the top option again when the picker reopens", () => {
     withScrollIntoView(() => {
       const { button, input } = renderCombobox();
