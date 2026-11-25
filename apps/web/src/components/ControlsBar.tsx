@@ -107,10 +107,15 @@ export function ControlsBar({
     if (hasValidationErrors) setSheetOpen(true);
   }
 
-  /** A location edit supersedes any geolocation request still in flight. */
+  /**
+   * A location edit supersedes any geolocation request still in flight, and its error: once the user has
+   * chosen a place, "choose a preset" no longer applies. The request ID keeps a late reply from bringing
+   * the error back.
+   */
   const supersedeGeoRequest = () => {
     geoRequestRef.current += 1;
     setLocating(false);
+    setGeoStatus(null);
   };
 
   const latError = validationErrors.find((e) => e.field === "latitude")?.message;

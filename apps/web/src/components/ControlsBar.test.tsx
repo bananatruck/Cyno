@@ -162,6 +162,30 @@ describe("ControlsBar", () => {
       expect(screen.getByRole("button", { name: "Use my location" })).toHaveProperty("disabled", false);
     });
 
+    it.each([
+      [
+        "choosing a preset",
+        () => {
+          fireEvent.click(screen.getByRole("button", { name: /^Place preset/ }));
+          fireEvent.click(screen.getByRole("option", { name: /Tokyo/ }));
+        },
+      ],
+      [
+        "editing a coordinate",
+        () => {
+          fireEvent.change(screen.getByLabelText("Latitude"), { target: { value: "40" } });
+        },
+      ],
+    ])("clears a location error after %s", (_change, changeLocation) => {
+      const requests = stubGeolocation();
+      render(<ControlsHarness />);
+      fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
+      act(() => requests[0]!.error(positionError(1)));
+      expect(screen.queryByText(/Location access was denied/)).not.toBeNull();
+      changeLocation();
+      expect(screen.queryByText(/Location access was denied/)).toBeNull();
+    });
+
     it("ignores a position that arrives after a preset is chosen", () => {
       const requests = stubGeolocation();
       const onUseGeoLocation = vi.fn();
