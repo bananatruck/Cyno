@@ -56,7 +56,9 @@ export function PlaceCombobox({
     if (!scrollActiveOption.current || !activeOptionId) return;
     scrollActiveOption.current = false;
     optionRefs.current.get(activeOptionId)?.scrollIntoView({ block: "nearest" });
-  }, [activeOptionId]);
+    // A query change can reset the active option to one that is not in view; browsers do not reveal an
+    // aria-activedescendant target on their own, so Enter would choose an option the user cannot see.
+  }, [activeOptionId, query]);
 
   const choosePreset = (preset: PlacePreset, returnFocus = false) => {
     onSelectPreset(preset);
@@ -116,6 +118,7 @@ export function PlaceCombobox({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
+              scrollActiveOption.current = true;
               setActiveIndex(0);
             }}
             onKeyDown={(e) => {

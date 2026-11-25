@@ -206,6 +206,16 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
   const terminator = Math.abs(1 - 2 * illumination) * 7;
   const waning = plan.moon.phaseName.startsWith("Waning") || plan.moon.phaseName === "Last Quarter";
   const handlePointerSelection = (event: MouseEvent<SVGSVGElement>) => {
+    // A click with detail 0 is not from a pointer (assistive technology, element.click()): it has no
+    // meaningful coordinates, so it selects the marker it was dispatched to.
+    if (event.detail === 0 && event.target instanceof Element) {
+      const marker = event.target.closest("[data-object-id]");
+      const objectId = marker?.getAttribute("data-object-id");
+      if (objectId) {
+        onSelect(objectId);
+        return;
+      }
+    }
     const bounds = event.currentTarget.getBoundingClientRect();
     if (bounds.width <= 0 || bounds.height <= 0) return;
     const scale = Math.min(bounds.width / 480, bounds.height / 480);
@@ -296,6 +306,7 @@ export function SkyChart({ plan, time, selectedId, onSelect, className }: SkyCha
             <g
               key={object.id}
               transform={`translate(${position.x} ${position.y})`}
+              data-object-id={object.id}
               role="button"
               tabIndex={0}
               aria-label={label}

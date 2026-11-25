@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { InputError, NightPlan, PlanInput } from "@cyno/engine";
 import { parsePlanInput } from "@cyno/engine/input";
-import { PlanRunner, type ComputeResult } from "./planRunner";
+import { PlanRunner, PlanRunnerDisposedError, type ComputeResult } from "./planRunner";
 import { fetchCloudForecast, type ForecastStatus, type WeatherStatus } from "./weather";
 
 export type PlanStatus = "idle" | "computing" | "ready" | "error";
@@ -150,8 +150,9 @@ export function usePlan(rawInput: unknown, label: string, weatherEnabled = true)
 
     const abortController = new AbortController();
     const { signal } = abortController;
+    // An aborted request, or one dropped by a retry or unmount disposing the runner, has no result to show.
     const ignoreCancellation = (error: unknown) => {
-      if (!signal.aborted) throw error;
+      if (!signal.aborted && !(error instanceof PlanRunnerDisposedError)) throw error;
     };
 
     runner.compute(input, { signal }).then((base) => update((run) => ({ ...run, base })), ignoreCancellation);
@@ -238,9 +239,14 @@ export function usePlan(rawInput: unknown, label: string, weatherEnabled = true)
     errors: [],
     isWorkerError: false,
     weatherStatus: weatherEnabled ? "loading" : "disabled",
+    // With the forecast now off, the stale plan's earlier forecast status no longer applies.
     stalePlan:
       stale && stale.inputKey !== inputKey
-        ? { plan: stale.plan, label: stale.label, weatherStatus: stale.weatherStatus }
+        ? {
+            plan: stale.plan,
+            label: stale.label,
+            weatherStatus: weatherEnabled ? stale.weatherStatus : "disabled",
+          }
         : null,
     retry,
   };

@@ -19,14 +19,27 @@ export function addOneDay(dateStr: string): string {
   return new Date(ms + DAY_MS).toISOString().slice(0, 10);
 }
 
+/**
+ * Open-Meteo's forecast starts at 0:00 today and returns at most 16 days (forecast_days 0 to 16,
+ * https://open-meteo.com/en/docs), so the last day it serves is today + 15 in the requested time zone
+ * (GMT here); an end_date after it is rejected with HTTP 400.
+ */
+const LAST_SERVED_DAY = 15;
+
 export function isDateInForecastWindow(dateStr: string, now: Date = new Date()): boolean {
   const targetMs = Date.parse(`${dateStr}T12:00:00Z`);
   if (!Number.isFinite(targetMs)) return false;
   const todayUtcStr = now.toISOString().slice(0, 10);
   const todayMs = Date.parse(`${todayUtcStr}T12:00:00Z`);
   const diffDays = (targetMs - todayMs) / DAY_MS;
-  // Open-Meteo forecasts cover today (allowing -1 day for timezone differences) through +15 days (16 days total).
-  return diffDays >= -1 && diffDays <= 15;
+  // Today (allowing -1 day for time zone differences) through the last served day.
+  return diffDays >= -1 && diffDays <= LAST_SERVED_DAY;
+}
+
+/** The last day Open-Meteo serves a forecast for, as yyyy-mm-dd in GMT. */
+function lastServedDay(now: Date): string {
+  const todayMs = Date.parse(`${now.toISOString().slice(0, 10)}T12:00:00Z`);
+  return new Date(todayMs + LAST_SERVED_DAY * DAY_MS).toISOString().slice(0, 10);
 }
 
 export function mapOpenMeteoToCloudSamples(body: unknown): CloudSample[] {
@@ -72,7 +85,11 @@ export async function fetchCloudForecast(
     return { samples: [], status: "out-of-range" };
   }
 
-  const endDate = addOneDay(date);
+  // The night runs into the next morning, so ask for the following day too, but never past the last
+  // served day: for the last accepted date the forecast then covers only its evening.
+  const nextDay = addOneDay(date);
+  const lastDay = lastServedDay(options.now ?? new Date());
+  const endDate = nextDay > lastDay ? lastDay : nextDay;
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),

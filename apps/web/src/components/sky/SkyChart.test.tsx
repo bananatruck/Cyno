@@ -254,6 +254,36 @@ describe("SkyChart", () => {
     fireEvent.keyDown(button, { key: " " });
     expect(onSelect.mock.calls).toEqual([[object.id], [object.id]]);
   });
+  it("selects the activated marker on a click without pointer coordinates", () => {
+    const onSelect = vi.fn();
+    const object = night.objects.find(
+      (candidate) => (nearest(candidate.track, Date.parse(time))?.altDeg ?? -90) >= 0,
+    );
+    if (!object) throw new Error("Expected a visible object in real engine fixture");
+    render(<SkyChart plan={night} time={time} selectedId={null} onSelect={onSelect} />);
+    const svg = document.querySelector("figure > svg");
+    if (!(svg instanceof SVGSVGElement)) throw new Error("Expected the sky chart SVG");
+    vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 480,
+      bottom: 480,
+      width: 480,
+      height: 480,
+      toJSON: () => ({}),
+    });
+    const button = screen
+      .getAllByRole("button")
+      .find((candidate) => candidate.getAttribute("aria-label")?.startsWith(`${object.name},`));
+    if (!button) throw new Error("Expected object button");
+    // Assistive technology activates with a click whose detail is 0 and whose coordinates are 0, 0,
+    // which maps to the chart corner (-240, -240), far from every marker.
+    fireEvent.click(button, { detail: 0, clientX: 0, clientY: 0 });
+    expect(onSelect).toHaveBeenCalledWith(object.id);
+  });
+
   it("selects the nearest marker when two pointer hit areas overlap", () => {
     const firstObject = night.objects[0];
     const secondObject = night.objects[1];

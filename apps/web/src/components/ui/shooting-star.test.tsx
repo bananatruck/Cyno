@@ -1,6 +1,6 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ShootingStars } from "./shooting-stars";
+import { ShootingStars } from "./shooting-star";
 
 let reducedMotion = false;
 let onSubscribe: () => void = () => {};

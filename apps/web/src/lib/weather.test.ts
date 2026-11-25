@@ -73,3 +73,30 @@ describe("weather", () => {
     });
   });
 });
+
+describe("forecast request range", () => {
+  // Open-Meteo serves forecasts from today through today + 15 days (forecast_days at most 16); an end_date
+  // one day later is rejected with HTTP 400 ("Parameter 'end_date' is out of allowed range").
+  const now = new Date("2026-11-17T20:00:00Z");
+  const requested = async (date: string) => {
+    const urls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify({ hourly: { time: ["2026-12-02T00:00"], cloud_cover: [10] } }));
+    }) as unknown as typeof fetch;
+    await fetchCloudForecast(33.77, -118.19, date, { now, fetchImpl });
+    return new URL(urls[0]!).searchParams;
+  };
+
+  it("asks for the following day when it is served", async () => {
+    const params = await requested("2026-12-01");
+    expect(params.get("start_date")).toBe("2026-12-01");
+    expect(params.get("end_date")).toBe("2026-12-02");
+  });
+
+  it("stops at the last served day for the last accepted date", async () => {
+    const params = await requested("2026-12-02");
+    expect(params.get("start_date")).toBe("2026-12-02");
+    expect(params.get("end_date")).toBe("2026-12-02");
+  });
+});

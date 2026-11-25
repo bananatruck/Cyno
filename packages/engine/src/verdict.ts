@@ -99,7 +99,7 @@ export function verdict(
         : []),
       ...(dark.level === "nautical-twilight" ? [limitedDarknessReason(condition, lowestSunAltDeg)] : []),
       formatDarkWindowReason(dark, clock),
-      `The ${Math.round(moon.illumination * 100)}% Moon is up for ${moon.hoursUpInDarkWindow.toFixed(1)} dark hours.`,
+      `The ${Math.round(moon.illumination * 100)}% Moon is up for ${moonHours(moon.hoursUpInDarkWindow)} dark hours.`,
       clouds === null
         ? "Cloud cover is unknown."
         : clouds.coveredFraction < 1
@@ -107,4 +107,9 @@ export function verdict(
           : `Cloud cover averages ${Math.round(clouds.mean)}%.`,
     ],
   };
+}
+
+/** Hours to one decimal, except that a real interval shorter than that is not shown as 0.0. */
+function moonHours(hours: number): string {
+  return hours > 0 && hours < 0.05 ? "less than 0.1" : hours.toFixed(1);
 }

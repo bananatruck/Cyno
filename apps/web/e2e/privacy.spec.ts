@@ -68,3 +68,25 @@ test("weather opt-out persists and leaves the full astronomy plan usable without
   await expect(forecast).toContainText("Cloud forecast is off");
   expect(requests).toBe(sent);
 });
+
+test("loads the plan from the address: an old query link, a new fragment, and back", async ({ page }) => {
+  await page.route(OPEN_METEO, (route) => route.abort());
+  const verdict = page.getByRole("region", { name: "Tonight's verdict" });
+
+  // An old query-style link opens its plan and is rewritten to a fragment, which reloads do not send.
+  await page.goto(`${LONG_BEACH}&name=Long%20Beach`);
+  await expect(verdict).toContainText("Long Beach");
+  await expect.poll(() => new URL(page.url()).search).toBe("");
+  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get("lat")).toBe("33.77");
+
+  // Opening another shared plan in the same tab changes only the fragment; the page must follow it.
+  await page.evaluate(() => {
+    window.location.hash = "lat=-33.9&lon=18.4&date=2026-11-17&sky=dark&eq=eye&name=Cape%20Town";
+  });
+  await expect(verdict).toContainText("Cape Town");
+
+  // Back returns to the earlier plan in the same document.
+  await page.goBack();
+  await expect(verdict).toContainText("Long Beach");
+  await expect(verdict).not.toContainText("Cape Town");
+});

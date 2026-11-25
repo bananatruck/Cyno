@@ -5,7 +5,9 @@
 Milestone 1 is the one the README names: take a latitude, longitude and date, and return a ranked list of observable objects with the reasoning shown.
 It ships as two parts in one pnpm workspace: `packages/engine` (pure TypeScript, no DOM, works offline) and `apps/web` (a React app that calls the engine in the browser).
 There are no API keys, no paid services, no server and no model calls at runtime.
-The only network call is an optional cloud cover forecast from Open-Meteo, made by the web app; everything else works offline.
+The only network call the app makes is an optional cloud cover forecast from Open-Meteo.
+Loading the page itself needs a connection, as there is no offline install (no service worker or manifest).
+Once the page has loaded, every calculation runs in the browser without the network, except that a retry after a failed calculation worker fetches the worker again and fails offline if the browser has not cached it.
 The conversational agent, notifications, news digest, AR and the Android app from `GPTPlan.md` and `GeminiPlan.md` are out of scope.
 From `GeminiPlan.md` this milestone keeps the night-first look, the Red-Light Mode toggle, glass panels, and the Go/No-Go verdict.
 
@@ -91,7 +93,7 @@ Polar day, polar night and nights without full darkness are normal results with 
 
 ## Web app
 
-React 19, Vite, TypeScript and Tailwind CSS v4, with components adapted from 21st.dev, React Bits, Magic UI and Aceternity UI.
+React 19, Vite, TypeScript and Tailwind CSS v4, with components adapted from 21st.dev, React Bits and Magic UI, and its own starfield backdrop.
 The sky chart is an SVG azimuthal projection (zenith in the centre, horizon at the edge, north up, east to the left as seen looking up), showing the ranked objects and the bright stars at the selected time, with a time scrubber shared with the timeline.
 The night timeline shows the Sun's darkness bands from sunset to sunrise, the Moon's altitude, the cloud forecast when known, and the selected object's altitude.
 Red-Light Mode turns the whole interface deep red to protect night vision, and the choice is remembered in the browser.

@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Equipment, NightPlan, SkyQuality } from "@cyno/engine";
 import { NightTimeline, SkyChart } from "@/components/sky";
 import { ControlsBar } from "@/components/ControlsBar";
 import { RankedList } from "@/components/RankedList";
 import { VerdictBanner } from "@/components/VerdictBanner";
-import { ShootingStars } from "@/components/ui/shooting-stars";
-import { StarsBackground } from "@/components/ui/stars-background";
+import { ShootingStars } from "@/components/ui/shooting-star";
+import { StarsBackground } from "@/components/ui/starfield";
 import type { PlacePreset } from "@/lib/places";
-import { coordinatePlaceName, parseCoordinateText, readUrlState } from "@/lib/urlState";
+import {
+  coordinatePlaceName,
+  hasPlanParams,
+  parseCoordinateText,
+  planParamsOf,
+  readUrlState,
+} from "@/lib/urlState";
 import { usePlan } from "@/lib/usePlan";
 
 const RED_MODE_STORAGE_KEY = "cyno:red-mode";
@@ -42,8 +48,10 @@ function defaultSelectedTime(plan: NightPlan): string {
 }
 
 export default function App() {
+  /** The address that holds the current plan, kept for restoring it after an in-page link. */
+  const planUrl = useRef<string | null>(null);
   const initial = useMemo(
-    () => readUrlState(typeof window !== "undefined" ? window.location.search : ""),
+    () => readUrlState(typeof window !== "undefined" ? planParamsOf(window.location) : ""),
     [],
   );
   const [latText, setLatText] = useState(initial.latText);
@@ -95,9 +103,35 @@ export default function App() {
     params.set("sky", sky);
     params.set("eq", equipment);
     if (placeName) params.set("name", placeName);
-    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    // The fragment is never sent to the page host, so a reload or a shared link keeps the coordinates in
+    // the browser; this also drops a plan query string from an older link.
+    const nextUrl = `${window.location.pathname}#${params.toString()}`;
+    planUrl.current = nextUrl;
     window.history.replaceState(null, "", nextUrl);
   }, [latText, lonText, date, sky, equipment, placeName]);
+
+  // The fragment can change while the page stays open: opening another shared plan in the same tab, or
+  // going back or forward between plans, keeps the document, so a new plan fragment is loaded here. An
+  // in-page link (#top, the verdict explanation) replaces the fragment after the browser has scrolled to
+  // its target; then the plan shown is put back so a reload or a copied link still holds it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onHashChange = () => {
+      if (hasPlanParams(window.location.hash)) {
+        const incoming = readUrlState(window.location.hash.slice(1));
+        setLatText(incoming.latText);
+        setLonText(incoming.lonText);
+        setDate(incoming.date);
+        setSky(incoming.sky);
+        setEquipment(incoming.equipment);
+        setPlaceName(incoming.placeName);
+      } else if (planUrl.current) {
+        window.history.replaceState(null, "", planUrl.current);
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   const rawPlanInput = useMemo(
     () => ({
@@ -258,9 +292,9 @@ export default function App() {
             className="grid grid-cols-1 gap-5 lg:grid-cols-12"
           >
             <div className="h-[520px] animate-pulse rounded-2xl border border-moonsilver/15 bg-nautical/35 p-6 lg:col-span-7">
-              <div className="h-10 w-44 rounded-lg bg-civil/35" />
-              <div className="mt-3 h-4 w-72 rounded bg-civil/25" />
-              <div className="mx-auto mt-10 h-80 w-80 rounded-full border border-moonsilver/15 bg-abyss/40" />
+              <div className="h-10 w-44 max-w-full rounded-lg bg-civil/35" />
+              <div className="mt-3 h-4 w-72 max-w-full rounded bg-civil/25" />
+              <div className="mx-auto mt-10 aspect-square w-80 max-w-full rounded-full border border-moonsilver/15 bg-abyss/40" />
             </div>
             <div className="h-[520px] animate-pulse rounded-2xl border border-moonsilver/15 bg-nautical/35 p-6 lg:col-span-5">
               <div className="h-7 w-48 rounded bg-civil/35" />

@@ -38,6 +38,23 @@ export interface UrlState {
   placeName: string;
 }
 
+const PLAN_KEYS = ["lat", "lon", "date", "sky", "eq", "name"];
+
+/** Whether a fragment or query string holds any plan parameter. */
+export function hasPlanParams(text: string): boolean {
+  const params = new URLSearchParams(text.replace(/^[#?]/, ""));
+  return PLAN_KEYS.some((key) => params.has(key));
+}
+
+/**
+ * The plan parameters of a page address. The app keeps them in the fragment (`#lat=…`), which browsers
+ * never send to the page host, so coordinates stay in the browser; links made before that used the
+ * query string, which is still read when the fragment holds no plan.
+ */
+export function planParamsOf(location: { search: string; hash: string }): string {
+  return hasPlanParams(location.hash) ? location.hash.slice(1) : location.search;
+}
+
 export function readUrlState(search: string, now: Date = new Date()): UrlState {
   const params = new URLSearchParams(search);
   const rawLat = params.get("lat");

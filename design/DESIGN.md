@@ -64,7 +64,7 @@ Monospace data labels were dropped in favour of Manrope's tabular figures.
 
 ## Component sources
 
-Backdrop: Aceternity UI Stars Background and Shooting Stars, at low density.
+Backdrop: Cyno's own starfield and shooting star (`starfield.tsx`, `shooting-star.tsx`), at low density.
 Scores and counts: Magic UI Number Ticker; the selected object card carries Magic UI Border Beam.
 Headline and verdict entrance: React Bits Blur Text; list cards use React Bits Spotlight Card.
 Controls: a segmented control and a combobox from 21st.dev.
