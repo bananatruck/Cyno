@@ -93,6 +93,7 @@ The build uses relative asset paths, so the same output works at the root of a d
   If storage is blocked, the app warns you and the choice may not survive a reload.
   Cloud cover is then unknown, so rankings and the verdict ignore clouds; the positions, Moon information, chart and timeline still work.
 - The address bar always holds the place, date, sky and equipment, so a plan can be shared as a link.
+  They sit after the `#`, which browsers never send to the page host, so coordinates leave the browser only for the forecast; older links with `?lat=` still open and are rewritten that way.
 - Once the page has loaded, every calculation runs in the browser with no network; only the optional cloud forecast needs a connection. Loading the page itself needs a connection, as there is no offline install yet. Without a forecast the app says so and ranks without clouds instead of assuming a clear sky. One exception: after the page goes offline, a retry following a failed calculation worker has to fetch the worker (or, after a second failure, the main-thread fallback) again, and that fails if the browser has not cached it.
 
 ## How the ranking works

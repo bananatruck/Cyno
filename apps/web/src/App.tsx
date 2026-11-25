@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Equipment, NightPlan, SkyQuality } from "@cyno/engine";
 import { NightTimeline, SkyChart } from "@/components/sky";
 import { ControlsBar } from "@/components/ControlsBar";
@@ -7,7 +7,13 @@ import { VerdictBanner } from "@/components/VerdictBanner";
 import { ShootingStars } from "@/components/ui/shooting-star";
 import { StarsBackground } from "@/components/ui/starfield";
 import type { PlacePreset } from "@/lib/places";
-import { coordinatePlaceName, parseCoordinateText, readUrlState } from "@/lib/urlState";
+import {
+  coordinatePlaceName,
+  hasPlanParams,
+  parseCoordinateText,
+  planParamsOf,
+  readUrlState,
+} from "@/lib/urlState";
 import { usePlan } from "@/lib/usePlan";
 
 const RED_MODE_STORAGE_KEY = "cyno:red-mode";
@@ -42,8 +48,10 @@ function defaultSelectedTime(plan: NightPlan): string {
 }
 
 export default function App() {
+  /** The address that holds the current plan, kept for restoring it after an in-page link. */
+  const planUrl = useRef<string | null>(null);
   const initial = useMemo(
-    () => readUrlState(typeof window !== "undefined" ? window.location.search : ""),
+    () => readUrlState(typeof window !== "undefined" ? planParamsOf(window.location) : ""),
     [],
   );
   const [latText, setLatText] = useState(initial.latText);
@@ -95,9 +103,25 @@ export default function App() {
     params.set("sky", sky);
     params.set("eq", equipment);
     if (placeName) params.set("name", placeName);
-    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    // The fragment is never sent to the page host, so a reload or a shared link keeps the coordinates in
+    // the browser; this also drops a plan query string from an older link.
+    const nextUrl = `${window.location.pathname}#${params.toString()}`;
+    planUrl.current = nextUrl;
     window.history.replaceState(null, "", nextUrl);
   }, [latText, lonText, date, sky, equipment, placeName]);
+
+  // An in-page link (#top, the verdict explanation) replaces the fragment after the browser has scrolled
+  // to its target; put the plan back so a reload or a copied link still holds it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const restore = () => {
+      if (!hasPlanParams(window.location.hash) && planUrl.current) {
+        window.history.replaceState(null, "", planUrl.current);
+      }
+    };
+    window.addEventListener("hashchange", restore);
+    return () => window.removeEventListener("hashchange", restore);
+  }, []);
 
   const rawPlanInput = useMemo(
     () => ({

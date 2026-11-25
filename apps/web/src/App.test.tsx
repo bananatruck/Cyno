@@ -68,3 +68,37 @@ describe("forecast preference storage", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+describe("plan address", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  // The footer says coordinates stay in the browser when the forecast is off, so the plan lives in the
+  // fragment, which browsers never send to the page host, not in the query string.
+  it("moves a query-string plan link into the fragment and keeps it there", () => {
+    window.history.replaceState(null, "", "/?lat=10.5&lon=20.25&date=2026-11-17&sky=rural&eq=eye");
+    render(<App />);
+    expect(window.location.search).toBe("");
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    expect(params.get("lat")).toBe("10.5");
+    expect(params.get("lon")).toBe("20.25");
+    expect(params.get("sky")).toBe("rural");
+  });
+
+  it("reads a plan from the fragment", () => {
+    window.history.replaceState(null, "", "/#lat=-33.9&lon=18.4&date=2026-11-17&sky=dark&eq=binoculars");
+    render(<App />);
+    expect(usePlan).toHaveBeenLastCalledWith(
+      expect.objectContaining({ latitude: -33.9, longitude: 18.4, sky: "dark", equipment: "binoculars" }),
+      expect.any(String),
+      expect.any(Boolean),
+    );
+  });
+
+  it("puts the plan back after an in-page link replaces the fragment", () => {
+    window.history.replaceState(null, "", "/#lat=10.5&lon=20.25&date=2026-11-17&sky=rural&eq=eye");
+    render(<App />);
+    window.history.pushState(null, "", "/#top");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(new URLSearchParams(window.location.hash.slice(1)).get("lat")).toBe("10.5");
+  });
+});
