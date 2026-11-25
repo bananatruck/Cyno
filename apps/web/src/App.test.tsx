@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { usePlan } from "@/lib/usePlan";
@@ -92,6 +92,36 @@ describe("plan address", () => {
       expect.any(String),
       expect.any(Boolean),
     );
+  });
+
+  it("loads a plan fragment that arrives while the page is open", () => {
+    window.history.replaceState(null, "", "/#lat=10.5&lon=20.25&date=2026-11-17&sky=rural&eq=eye");
+    render(<App />);
+    // Opening another shared plan in the same tab, or going back or forward between plans, only
+    // changes the fragment: the document is kept, so App must read the new plan itself.
+    act(() => {
+      window.history.pushState(null, "", "/#lat=-33.9&lon=18.4&date=2026-12-01&sky=dark&eq=binoculars");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(usePlan).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        latitude: -33.9,
+        longitude: 18.4,
+        date: "2026-12-01",
+        sky: "dark",
+        equipment: "binoculars",
+      }),
+      expect.any(String),
+      expect.any(Boolean),
+    );
+    expect(new URLSearchParams(window.location.hash.slice(1)).get("lat")).toBe("-33.9");
+
+    // An unrelated anchor afterwards puts back the plan now shown, not the first one.
+    act(() => {
+      window.history.pushState(null, "", "/#top");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(new URLSearchParams(window.location.hash.slice(1)).get("lat")).toBe("-33.9");
   });
 
   it("puts the plan back after an in-page link replaces the fragment", () => {

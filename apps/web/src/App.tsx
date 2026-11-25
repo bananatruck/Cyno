@@ -110,17 +110,27 @@ export default function App() {
     window.history.replaceState(null, "", nextUrl);
   }, [latText, lonText, date, sky, equipment, placeName]);
 
-  // An in-page link (#top, the verdict explanation) replaces the fragment after the browser has scrolled
-  // to its target; put the plan back so a reload or a copied link still holds it.
+  // The fragment can change while the page stays open: opening another shared plan in the same tab, or
+  // going back or forward between plans, keeps the document, so a new plan fragment is loaded here. An
+  // in-page link (#top, the verdict explanation) replaces the fragment after the browser has scrolled to
+  // its target; then the plan shown is put back so a reload or a copied link still holds it.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const restore = () => {
-      if (!hasPlanParams(window.location.hash) && planUrl.current) {
+    const onHashChange = () => {
+      if (hasPlanParams(window.location.hash)) {
+        const incoming = readUrlState(window.location.hash.slice(1));
+        setLatText(incoming.latText);
+        setLonText(incoming.lonText);
+        setDate(incoming.date);
+        setSky(incoming.sky);
+        setEquipment(incoming.equipment);
+        setPlaceName(incoming.placeName);
+      } else if (planUrl.current) {
         window.history.replaceState(null, "", planUrl.current);
       }
     };
-    window.addEventListener("hashchange", restore);
-    return () => window.removeEventListener("hashchange", restore);
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
   const rawPlanInput = useMemo(
