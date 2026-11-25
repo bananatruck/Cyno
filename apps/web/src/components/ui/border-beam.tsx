@@ -38,7 +38,11 @@ export const BorderBeam = ({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 rounded-[inherit] border-(length:--border-beam-width) border-transparent mask-[linear-gradient(transparent,transparent),linear-gradient(#000,#000)] mask-intersect [mask-clip:padding-box,border-box]"
+      // Two opaque layers, one clipped to the padding box and one to the border box, combined with
+      // exclude: only the border band stays opaque, so the beam shows there and nowhere inside. An
+      // intersect with a transparent layer is transparent by the CSS masking spec, even where one
+      // engine happens to paint it. The smoke test compares rendered pixels of that band.
+      className="pointer-events-none absolute inset-0 rounded-[inherit] border-(length:--border-beam-width) border-transparent mask-[linear-gradient(#000,#000),linear-gradient(#000,#000)] mask-exclude [mask-clip:padding-box,border-box]"
       style={
         {
           "--border-beam-width": `${borderWidth}px`,

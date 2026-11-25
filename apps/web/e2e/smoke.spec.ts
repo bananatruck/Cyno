@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { readBeamVisibility } from "./beam-visibility";
+import { compareCardShots, readBeamVisibility } from "./beam-visibility";
 import { waitForPageSettle } from "../src/lib/page-settle";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -352,7 +352,31 @@ test("draws a visible border beam inside the selected ranked card", async ({ pag
   expect(beam.ringWidth, "ring border width").toBeGreaterThan(0);
   expect(beam.visibleWidth, "visible width inside the card's border box").toBeGreaterThan(0);
   expect(beam.visibleHeight, "visible height inside the card's border box").toBeGreaterThan(0);
-  expect(beam.reachesBorderBand, "the visible part lies on the masked border band").toBe(true);
+  expect(beam.reachesBorderBand, "the beam's box reaches the ring's border band").toBe(true);
+
+  // What a person sees: the same card with and without the beam must differ on the border band and
+  // nowhere inside it. A mask that hides the beam leaves the band unchanged; a missing mask paints
+  // the beam over the interior.
+  const { band, interiorFrom } = await card.evaluate((element) => {
+    const ring = element.querySelector("[data-border-beam]")?.parentElement;
+    if (!ring) throw new Error("Expected the beam inside its ring");
+    const width = (node: Element, property: "borderTopWidth" | "borderTopLeftRadius") =>
+      Number.parseFloat(getComputedStyle(node)[property]) || 0;
+    const band = Math.ceil(width(element, "borderTopWidth") + width(ring, "borderTopWidth")) + 1;
+    return { band, interiorFrom: band + Math.ceil(width(element, "borderTopLeftRadius")) + 2 };
+  });
+  const beamElement = card.locator("[data-border-beam]");
+  const withBeam = (await card.screenshot({ animations: "disabled" })).toString("base64");
+  await beamElement.evaluate((element) => {
+    (element as HTMLElement).style.visibility = "hidden";
+  });
+  const withoutBeam = (await card.screenshot({ animations: "disabled" })).toString("base64");
+  await beamElement.evaluate((element) => {
+    (element as HTMLElement).style.visibility = "";
+  });
+  const painted = await page.evaluate(compareCardShots, { withBeam, withoutBeam, band, interiorFrom });
+  expect(painted.inBand, "beam pixels painted on the border band").toBeGreaterThan(20);
+  expect(painted.inside, "beam pixels painted inside the card").toBe(0);
 
   await card.screenshot({
     path: testInfo.outputPath("selected-card-border-beam.png"),

@@ -55,4 +55,16 @@ describe("BorderBeam", () => {
     act(() => media.setReducedMotion(true));
     expect(beam?.getAttribute("data-motion")).toBe("static");
   });
+
+  it("masks the ring to its border band with two opaque layers and exclude", () => {
+    mockReducedMotion(false);
+    const { container } = render(<BorderBeam />);
+    const ring = container.querySelector("[data-border-beam]")?.parentElement;
+    const classes = ring?.className.split(/\s+/) ?? [];
+    // A transparent layer intersected with anything is transparent, so the band would be hidden.
+    expect(classes).toContain("mask-[linear-gradient(#000,#000),linear-gradient(#000,#000)]");
+    expect(classes).toContain("mask-exclude");
+    expect(classes).toContain("[mask-clip:padding-box,border-box]");
+    expect(ring?.className).not.toContain("transparent,transparent");
+  });
 });
