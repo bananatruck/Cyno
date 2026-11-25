@@ -5,7 +5,9 @@
 Milestone 1 is the one the README names: take a latitude, longitude and date, and return a ranked list of observable objects with the reasoning shown.
 It ships as two parts in one pnpm workspace: `packages/engine` (pure TypeScript, no DOM, works offline) and `apps/web` (a React app that calls the engine in the browser).
 There are no API keys, no paid services, no server and no model calls at runtime.
-The only network call is an optional cloud cover forecast from Open-Meteo, made by the web app; everything else works offline.
+The only network call the app makes is an optional cloud cover forecast from Open-Meteo.
+Loading the page itself needs a connection, as there is no offline install (no service worker or manifest).
+Once the page has loaded, every calculation runs in the browser without the network, except that a retry after a failed calculation worker fetches the worker again and fails offline if the browser has not cached it.
 The conversational agent, notifications, news digest, AR and the Android app from `GPTPlan.md` and `GeminiPlan.md` are out of scope.
 From `GeminiPlan.md` this milestone keeps the night-first look, the Red-Light Mode toggle, glass panels, and the Go/No-Go verdict.
 
