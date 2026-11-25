@@ -45,10 +45,7 @@ export function ShootingStars({
   const [streak, setStreak] = useState<Streak | null>(null);
 
   useEffect(() => {
-    if (reducedMotion) {
-      setStreak(null);
-      return;
-    }
+    if (reducedMotion) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let frame: number | undefined;
     const pause = () => (maxDelay > minDelay ? minDelay + Math.random() * (maxDelay - minDelay) : minDelay);
@@ -93,6 +90,8 @@ export function ShootingStars({
     return () => {
       if (timer !== undefined) clearTimeout(timer);
       if (frame !== undefined) cancelAnimationFrame(frame);
+      // A streak cut off here must not stay frozen on screen if motion is allowed again.
+      setStreak(null);
     };
   }, [reducedMotion, minSpeed, maxSpeed, minDelay, maxDelay, trailLength]);
 

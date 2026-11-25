@@ -1,5 +1,5 @@
 // Cyno's own starfield backdrop, written for this project; MIT like the rest of Cyno (see LICENSE).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePrefersReducedMotion } from "@/lib/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 
@@ -28,18 +28,20 @@ const STAR_RGB = { night: "244, 239, 226", red: "255, 90, 78" } as const;
 /** Milliseconds the stars take to fade in after the page loads. */
 const FADE_IN_MS = 1200;
 
+function readRedMode(): boolean {
+  return typeof document !== "undefined" && document.documentElement.getAttribute("data-mode") === "red";
+}
+
+function subscribeRedMode(onChange: () => void): () => void {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => undefined;
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode"] });
+  return () => observer.disconnect();
+}
+
 /** Whether the page is in red-light mode, following the `data-mode` attribute on the root element. */
 function useRedMode(): boolean {
-  const read = () =>
-    typeof document !== "undefined" && document.documentElement.getAttribute("data-mode") === "red";
-  const [red, setRed] = useState(read);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setRed(read()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode"] });
-    setRed(read());
-    return () => observer.disconnect();
-  }, []);
-  return red;
+  return useSyncExternalStore(subscribeRedMode, readRedMode, () => false);
 }
 
 function scatter(width: number, height: number, density: number, twinkleShare: number): Star[] {
