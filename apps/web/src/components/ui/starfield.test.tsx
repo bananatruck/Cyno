@@ -1,6 +1,6 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StarsBackground } from "./stars-background";
+import { StarsBackground } from "./starfield";
 
 function mediaQuery(initial: boolean) {
   let matches = initial;

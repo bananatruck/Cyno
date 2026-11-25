@@ -23,13 +23,6 @@ Source: https://reactbits.dev, licence at https://github.com/DavidHDev/react-bit
 
 These two files are part of this application and are not offered as components on their own.
 
-### Aceternity UI: `stars-background.tsx`, `shooting-stars.tsx`
-
-Source: https://ui.aceternity.com, licence at https://ui.aceternity.com/licence.
-The Aceternity licence allows use in end products (websites and web apps) and forbids redistributing the items or their source files as components or templates.
-These two files are not covered by Cyno's MIT licence.
-Whether keeping their adapted source in a public repository is compatible with that licence has not been confirmed with Aceternity.
-
 ### Magic UI: `number-ticker.tsx`, `border-beam.tsx`
 
 Source: https://magicui.design (repository https://github.com/magicuidesign/magicui).

@@ -91,7 +91,7 @@ Polar day, polar night and nights without full darkness are normal results with 
 
 ## Web app
 
-React 19, Vite, TypeScript and Tailwind CSS v4, with components adapted from 21st.dev, React Bits, Magic UI and Aceternity UI.
+React 19, Vite, TypeScript and Tailwind CSS v4, with components adapted from 21st.dev, React Bits and Magic UI, and its own starfield backdrop.
 The sky chart is an SVG azimuthal projection (zenith in the centre, horizon at the edge, north up, east to the left as seen looking up), showing the ranked objects and the bright stars at the selected time, with a time scrubber shared with the timeline.
 The night timeline shows the Sun's darkness bands from sunset to sunrise, the Moon's altitude, the cloud forecast when known, and the selected object's altitude.
 Red-Light Mode turns the whole interface deep red to protect night vision, and the choice is remembered in the browser.

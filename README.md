@@ -167,5 +167,5 @@ The natural next steps, roughly in order:
 ## License
 
 MIT for Cyno's own code.
-Some adapted UI components and the catalog data keep their own terms: React Bits (MIT + Commons Clause), Aceternity UI (its own licence, not MIT) and OpenNGC (CC BY-SA 4.0).
+Some adapted UI components and the catalog data keep their own terms: React Bits (MIT + Commons Clause) and OpenNGC (CC BY-SA 4.0).
 The details and notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

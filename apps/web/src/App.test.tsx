@@ -4,8 +4,8 @@ import App from "./App";
 import { usePlan } from "@/lib/usePlan";
 
 vi.mock("@/lib/usePlan", () => ({ usePlan: vi.fn() }));
-vi.mock("@/components/ui/stars-background", () => ({ StarsBackground: () => null }));
-vi.mock("@/components/ui/shooting-stars", () => ({ ShootingStars: () => null }));
+vi.mock("@/components/ui/starfield", () => ({ StarsBackground: () => null }));
+vi.mock("@/components/ui/shooting-star", () => ({ ShootingStars: () => null }));
 
 // Use the real DOM storage even when Node exposes its own localStorage global.
 declare const jsdom: { window: Window };
