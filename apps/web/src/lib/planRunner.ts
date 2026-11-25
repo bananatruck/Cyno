@@ -34,11 +34,14 @@ interface PendingRequest {
 /** A worker that fails, then a fresh one that fails too, means workers do not work here. */
 const MAX_WORKER_FAILURES = 2;
 
-/** Null when the request was cancelled while the engine loaded. */
-async function computeOnMainThread(input: PlanInput, signal?: AbortSignal): Promise<ComputeResult | null> {
+/** Null when the request was cancelled or disposed while the engine loaded. */
+async function computeOnMainThread(
+  input: PlanInput,
+  cancelled: () => boolean,
+): Promise<ComputeResult | null> {
   try {
     const { planNight } = await import("@cyno/engine");
-    if (signal?.aborted) return null;
+    if (cancelled()) return null;
     return { ok: true, plan: planNight(input) };
   } catch (err) {
     if (err instanceof PlanInputError) return { ok: false, errors: err.errors, isWorkerError: false };
@@ -58,6 +61,8 @@ export class PlanRunner {
   private failures = 0;
   private nextId = 0;
   private readonly pending = new Map<number, PendingRequest>();
+  /** Requests computing on the main thread, so disposal can settle them too. */
+  private readonly onMainThread = new Set<Request>();
 
   /** Rejects with the signal's reason once the signal aborts. */
   compute(input: PlanInput, { signal }: ComputeOptions = {}): Promise<ComputeResult> {
@@ -100,15 +105,17 @@ export class PlanRunner {
   dispose(): void {
     this.worker?.terminate();
     this.worker = null;
-    const waiting = [...this.pending.values()];
+    const waiting = [...[...this.pending.values()].map(({ request }) => request), ...this.onMainThread];
     this.pending.clear();
-    for (const { request } of waiting) request.reject(new PlanRunnerDisposedError());
+    this.onMainThread.clear();
+    for (const request of waiting) request.reject(new PlanRunnerDisposedError());
   }
 
   private forget(request: Request): void {
     for (const [id, pending] of this.pending) {
       if (pending.request === request) this.pending.delete(id);
     }
+    this.onMainThread.delete(request);
   }
 
   private dispatch(request: Request): void {
@@ -130,7 +137,11 @@ export class PlanRunner {
   }
 
   private runOnMainThread(request: Request): void {
-    void computeOnMainThread(request.input, request.signal).then((result) => {
+    this.onMainThread.add(request);
+    // A request aborted or disposed while the engine loads is dropped before planNight runs.
+    const cancelled = () => Boolean(request.signal?.aborted) || !this.onMainThread.has(request);
+    void computeOnMainThread(request.input, cancelled).then((result) => {
+      if (!this.onMainThread.delete(request)) return;
       if (result) request.resolve(result);
     });
   }

@@ -122,6 +122,25 @@ describe("PlanRunner", () => {
   });
 
   it.each(["dispose", "reset"] as const)(
+    "settles main-thread fallback requests on %s without computing them",
+    async (method) => {
+      vi.stubGlobal("Worker", undefined);
+      const runner = new PlanRunner();
+      // Disposed while the engine module is still loading.
+      const unsignalled = runner.compute(LONG_BEACH);
+      const signalled = runner.compute(TOKYO, { signal: new AbortController().signal });
+      runner[method]();
+      await expect(unsignalled).rejects.toBeInstanceOf(PlanRunnerDisposedError);
+      await expect(signalled).rejects.toBeInstanceOf(PlanRunnerDisposedError);
+      // Let the engine import finish: neither request may run planNight afterwards.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(vi.mocked(planNight)).not.toHaveBeenCalled();
+      // The runner still computes on the main thread afterwards.
+      expect((await runner.compute(LONG_BEACH)).ok).toBe(true);
+    },
+  );
+
+  it.each(["dispose", "reset"] as const)(
     "settles pending requests on %s, with or without a signal",
     async (method) => {
       vi.stubGlobal("Worker", SilentWorker);
